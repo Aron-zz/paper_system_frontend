@@ -48,29 +48,33 @@ const form = ref({
   avatar: null,
 })
 
+const avatarPreview = ref(''); // 用于头像预览
 
 // 当前登录用户 ID（你可以从本地缓存、全局状态、pinia等获取）
 const currentUserId = localStorage.getItem('id');
 
 // 监听头像选择
 const handleAvatarUpload = (e) => {
-  form.value.avatar = e.target.files[0]
-}
+  form.value.avatar = e.target.files[0];
+  if (form.value.avatar) {
+    const reader = new FileReader();
+    reader.onload = () => {
+      avatarPreview.value = reader.result; // 设置头像预览
+    };
+    reader.readAsDataURL(form.value.avatar); // 读取头像文件为数据URL
+  }
+};
 
-// 上传头像，返回头像 URL（必须有后端接口支持 /api/user/upload-avatar）
+// 上传头像并返回 URL
 const uploadAvatar = async (file) => {
-  const formData = new FormData()
-  formData.append('avatar', file)
-
-  const res = await fetch('/api/user/upload-avatar', {
-    method: 'POST',
-    body: formData
-  })
-
-  if (!res.ok) throw new Error('头像上传失败')
-  const data = await res.json()
-  return data.url // 后端返回的头像 URL
-}
+  try {
+    const res = await api.uploadAvatar(file, currentUserId);
+    return res.avatarUrl; // 后端返回的头像 URL
+  } catch (error) {
+    console.error('头像上传失败', error);
+    throw new Error('头像上传失败');
+  }
+};
 
 // 提交资料
 const submitProfile = async () => {

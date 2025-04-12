@@ -35,11 +35,30 @@ const api = {
     newPassword
   }),
 
+  // 修改密码接口
+    resetPassword: (email, newPassword) =>
+      request.post('/api/user/reset-password', null, {
+        params: { email, newPassword }
+      }),
+
   getUserInfo: (userId) => request.get('/api/user/info', {
     params: { userId }
   }),
 
   completeProfile:(user) => request.post('/api/user/complete-profile', user),
+
+  // 上传头像
+    uploadAvatar: (file, userId) => {
+      const formData = new FormData();
+      formData.append('file', file);  // 后端接收字段名为 'file'
+      formData.append('userId', userId);
+
+      return request.post('/api/user/upload-avatar', formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data'  // 设置请求头为 multipart/form-data
+        }
+      });
+    },
 
   // 论文模块
   getAllPapers: () => request.get('/api/paper/all'),

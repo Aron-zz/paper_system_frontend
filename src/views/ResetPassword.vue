@@ -25,6 +25,12 @@
 import { ref, reactive } from 'vue'
 import axios from 'axios'
 
+import { useRouter } from 'vue-router';
+const router = useRouter();
+
+// 在需要使用的文件中
+import api from '../api/index.js';
+
 const form = reactive({
   email: '',
   code: '',
@@ -55,16 +61,15 @@ const handleReset = async () => {
     alert('两次密码不一致')
     return
   }
-  try {
-    await axios.post('/api/reset-password', {
-      email: form.email,
-      code: form.code,
-      newPassword: form.newPassword
-    })
-    alert('密码重置成功，请重新登录')
-  } catch (err) {
-    alert(err.response?.data?.message || '重置失败')
-  }
+   try {
+       // 调用 API 中的重置密码接口
+       const response = await api.resetPassword(form.email, form.newPassword);
+       console.log('修改密码响应数据:', response); // 调试用
+       alert('密码重置成功，请重新登录');
+       router.push('/login');
+     } catch (err) {
+       alert(err.response?.data?.message || '重置失败');
+     }
 }
 </script>
 
