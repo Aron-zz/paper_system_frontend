@@ -1,19 +1,33 @@
 <template>
   <div :class="{ dark: isDarkMode }" class="navbar">
     <span class="time-info">{{ currentTime }}</span>
-    <span class="user-info">你好！ User</span>
-    <button @click="toggleMenu">退出</button>
+    <span class="user-info">你好!</span>
+    <button @click="logout">退出</button>
   </div>
 </template>
 
 <script setup>
 import { defineProps } from 'vue'
+import { useRouter } from 'vue-router'
 
+const router = useRouter()
+
+// 定义 props
 const props = defineProps({
   currentTime: String,
   isDarkMode: Boolean
 })
 
+// 退出登录
+const logout = () => {
+  // 清除本地存储中的用户 ID
+  localStorage.removeItem('id')
+
+  // 跳转到登录页面
+  router.push('/login')
+}
+
+// 控制菜单显示/隐藏
 const toggleMenu = () => {
   console.log('Menu toggled')
 }

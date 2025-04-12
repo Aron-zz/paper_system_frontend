@@ -41,11 +41,12 @@ const api = {
         params: { email, newPassword }
       }),
 
-  getUserInfo: (userId) => request.get('/api/user/info', {
-    params: { userId }
-  }),
+  getUserInfo: (userId) => request.post('/api/user/info', { userId }),
+
 
   completeProfile:(user) => request.post('/api/user/complete-profile', user),
+
+  updateUserInfo: (user) => request.post('/api/user/update', user),
 
   // 上传头像
     uploadAvatar: (file, userId) => {
@@ -63,7 +64,15 @@ const api = {
   // 论文模块
   getAllPapers: () => request.get('/api/paper/all'),
 
-  getUserPapers: (userId) => request.get(`/api/paper/by-user/${userId}`)
+  getUserPapers: (userId) => request.get(`/api/paper/by-user/${userId}`),
+
+  // 每个用户发表的论文数
+  getUsersWithPaperCount: (page = 1, size = 10) =>
+    request.get('/api/user-paper/user-count', {
+      params: { page, size }
+    }),
 };
+
+
 
 export default api;

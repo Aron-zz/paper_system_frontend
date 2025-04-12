@@ -24,6 +24,10 @@
 import { ref, onMounted, onUnmounted } from 'vue'
 import Sidebar from '../../components/SideBar.vue'
 import Navbar from '../../components/NavBar.vue'
+import api from '../../api/index.js'
+import { useRouter } from 'vue-router'
+
+const router = useRouter()
 
 const isDarkMode = ref(false)
 const collapsed = ref(false)
@@ -51,15 +55,39 @@ const updateTime = () => {
 
 let timer = null
 
+// 加载用户信息并验证 ID
+const userId = localStorage.getItem('id')
+
+const loadUserInfo = async () => {
+  if (!userId) {
+    // 如果没有本地存储的 ID，直接跳转到登录页
+    router.push('/login')
+    return
+  }
+
+  try {
+    const res = await api.getUserInfo(userId)
+    if (!res || !res.id) {
+      // 如果后端返回无效的用户信息，跳转到登录页
+      router.push('/login')
+    }
+  } catch (err) {
+    console.error('获取用户信息失败', err)
+    router.push('/login')
+  }
+}
+
 onMounted(() => {
   updateTime()
   timer = setInterval(updateTime, 1000)
+  loadUserInfo() // 加载用户信息并验证 ID
 })
 
 onUnmounted(() => {
   clearInterval(timer)
 })
 </script>
+
 
 <style scoped>
 .home {

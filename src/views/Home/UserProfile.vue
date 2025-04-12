@@ -2,39 +2,40 @@
   <div class="user-profile">
     <div class="profile-header">
       <div class="avatar">
-        <img :src="avatarUrl" alt="User Avatar" />
-        <input type="file" @change="handleAvatarChange" />
-      </div>
+            <img :src="avatarUrl" alt="User Avatar" />
+            <input type="file" id="file-upload" @change="handleAvatarChange" accept="image/*" />
+            <button @click="triggerFileInput">上传头像</button>
+          </div>
       <div class="user-info">
-        <h2>{{ user.name }}</h2>
+        <h2>{{ user.username }}</h2>
         <p>{{ user.email }}</p>
         <p>{{ user.gender }}</p>
         <p>{{ user.birthday }}</p>
-        <p>{{ user.college }}</p>
+        <p>{{ user.organization }}</p>
       </div>
     </div>
 
     <div class="profile-edit">
       <h3>Edit Profile</h3>
       <form @submit.prevent="handleSubmit">
-        <label for="name">姓名:</label>
-        <input v-model="user.name" type="text" id="name" />
+        <label for="username">姓名:</label>
+        <input v-model="user.username" type="text" id="username" />
 
         <label for="email">邮箱:</label>
         <input v-model="user.email" type="email" id="email" />
 
         <label for="gender">性别:</label>
         <select v-model="user.gender">
-          <option value="Male">Male</option>
-          <option value="Female">Female</option>
-          <option value="Other">Other</option>
+          <option value="男">男</option>
+          <option value="女">女</option>
+          <option value="保密">保密</option>
         </select>
 
         <label for="birthday">生日:</label>
         <input v-model="user.birthday" type="date" id="birthday" />
 
-        <label for="college">学院:</label>
-        <input v-model="user.college" type="text" id="college" />
+        <label for="organization">组织:</label>
+        <input v-model="user.organization" type="text" id="organization" />
 
         <button type="submit">保存更改</button>
       </form>
@@ -43,39 +44,84 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue';
+import { ref, onMounted } from 'vue'
+import api from '../../api/index.js'
+import { useRoute } from 'vue-router'
 
 const user = ref({
-  name: 'John Doe',
-  email: 'john.doe@example.com',
-  gender: 'Male',
-  birthday: '1990-01-01',
-  college: 'Computer Science College'
-});
+  id: null,
+  username: '',
+  email: '',
+  gender: '',
+  birthday: '',
+  organization: '',
+  avatarUrl: '' //加上这一项确保能更新
+})
 
-const avatarUrl = ref('/path/to/default-avatar.png');
+const avatarUrl = ref('/default-avatar.png')
+const selectedFile = ref(null)
 
-const handleAvatarChange = (event) => {
-  const file = event.target.files[0];
-  if (file) {
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      avatarUrl.value = e.target.result;
-    };
-    reader.readAsDataURL(file);
+const route = useRoute()
+const userId = route.query.userId || localStorage.getItem('id')
+
+// 加载用户信息
+const loadUserInfo = async () => {
+  try {
+    const res = await api.getUserInfo(userId)
+     console.log('返回的用户信息：', res)
+
+     // 确保接收到的字段名称是正确的
+     user.value = res
+     avatarUrl.value = res.avatarUrl || '/default-avatar.png' // 这里使用 avatarUrl 来绑定
+  } catch (err) {
+    console.error('获取用户信息失败', err)
   }
-};
+}
 
-const handleSubmit = () => {
-  // Here, you can handle the submit logic to save changes (e.g., call an API)
-  console.log('User profile updated:', user.value);
-};
+// 触发文件选择
+const triggerFileInput = () => {
+  document.getElementById('file-upload').click()
+}
 
-// Simulate loading user data on mount (in real cases, you might fetch it from an API)
+// 处理头像变更
+const handleAvatarChange = (event) => {
+  const file = event.target.files[0]
+  if (file) {
+    selectedFile.value = file
+
+    const reader = new FileReader()
+    reader.onload = (e) => {
+      avatarUrl.value = e.target.result
+    }
+    reader.readAsDataURL(file)
+  }
+}
+
+// 提交更新
+const handleSubmit = async () => {
+  try {
+    // 如果选择了新头像，先上传头像
+    if (selectedFile.value) {
+      const res = await api.uploadAvatar(selectedFile.value, user.value.id)
+
+      // 设置返回的头像 URL 到 user.value.avatar 中
+      user.value.avatar = res.avatarUrl || ''
+    }
+
+    // 更新用户信息（包括 avatar 字段）
+    await api.updateUserInfo(user.value)
+    alert('更新成功')
+  } catch (err) {
+    console.error('更新失败：', err)
+    alert(err.response?.data?.message || '更新失败')
+  }
+}
+
 onMounted(() => {
-  console.log('User Profile Loaded');
-});
+  loadUserInfo()
+})
 </script>
+
 
 <style scoped>
 .user-profile {

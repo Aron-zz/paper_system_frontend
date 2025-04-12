@@ -3,13 +3,26 @@
     <!-- 用户列表和柱状图部分，只有在未选择用户时显示 -->
     <div v-if="!selectedUser" class="left-panel">
       <h2>User Articles</h2>
-      <user-article-table :users="paginatedUsers" :current-page="currentPage" @select-user="selectUser" />
-      <pagination :current-page="currentPage" :total-pages="totalPages" @change-page="changePage" />
+      <UserArticleTable
+        :users="users"
+        :current-page="currentPage"
+        :page-size="pageSize"
+        @select-user="selectUser"
+      />
+
+      <Pagination
+        :current-page="currentPage"
+        :total-pages="totalPages"
+        @change-page="changePage"
+      />
     </div>
 
     <div v-if="!selectedUser" class="right-panel">
       <h2>Article Statistics</h2>
-      <article-chart :data="articleChartData" />
+      <!-- 只有在有数据时显示图表 -->
+      <article-chart v-if="articleChartData.length > 0" :data="articleChartData" />
+      <p v-else v-if="users.length === 0">No users available</p>
+      <p v-else>Loading...</p> <!-- 加载中的状态 -->
     </div>
 
     <!-- 用户详情和文章信息部分，只有在选择用户后显示 -->
@@ -18,82 +31,99 @@
       <div class="user-info">
         <img :src="selectedUser.avatar" alt="Avatar" />
         <h3>{{ selectedUser.name }}</h3>
-        <p>Articles: {{ selectedUser.articles }}</p>
+        <p>Articles: {{ selectedUser.articleCount }}</p>
       </div>
       <article-list :articles="selectedUserArticles" />
     </div>
   </div>
 </template>
 
-
 <script setup>
-import { ref, computed } from 'vue';
+import { ref, computed, onMounted, watch } from 'vue';
 import UserArticleTable from '../../components/UserArticleTable.vue';
 import ArticleChart from '../../components/ArticleChart.vue';
 import ArticleList from '../../components/ArticleList.vue';
 import Pagination from '../../components/Pagination.vue';
+import api from '../../api/index.js';
 
-// 用户数据和文章数据（实际应该从后端 API 获取）
-const users = ref([
-  { id: 1, name: 'John Doe', avatar: 'user1.jpg', articles: 5 },
-  { id: 2, name: 'Jane Smith', avatar: 'user2.jpg', articles: 8 },
-  { id: 3, name: 'Mary Johnson', avatar: 'user3.jpg', articles: 3 },
-  { id: 4, name: 'James Brown', avatar: 'user4.jpg', articles: 10 },
-  { id: 5, name: 'Alice Cooper', avatar: 'user5.jpg', articles: 7 },
-  { id: 6, name: 'Bob Lee', avatar: 'user6.jpg', articles: 4 },
-]);
-
-const articles = ref([
-  { userId: 1, title: 'Article 1', content: 'Content of Article 1' },
-  { userId: 2, title: 'Article 2', content: 'Content of Article 2' },
-  { userId: 3, title: 'Article 3', content: 'Content of Article 3' },
-  { userId: 4, title: 'Article 4', content: 'Content of Article 4' },
-  { userId: 5, title: 'Article 5', content: 'Content of Article 5' },
-  { userId: 6, title: 'Article 6', content: 'Content of Article 6' },
-]);
-
+const users = ref([]);         // 当前页用户及其文章数量
+const articles = ref([]);      // 选中用户的文章
+const total = ref(0);          // 总用户数
 const currentPage = ref(1);
-const pageSize = 3; // 每页显示3个用户
-const selectedUser = ref(null);
+const pageSize = 3;            // 每页显示用户数
+const selectedUser = ref(null); // 当前选中的用户
+const isLoading = ref(false);   // 加载状态
 
-// 分页后的用户数据
-const paginatedUsers = computed(() => {
-  const startIndex = (currentPage.value - 1) * pageSize;
-  return users.value.slice(startIndex, startIndex + pageSize);
-});
+// 加载用户统计信息
+const loadUserPaperStats = async () => {
+  isLoading.value = true; // 开始加载
+  try {
+    const res = await api.getUsersWithPaperCount(currentPage.value, pageSize);
+    users.value = res.records;
+    total.value = res.total;
+  } catch (err) {
+    console.error('加载失败', err);
+    users.value = [];  // 如果加载失败，清空用户列表
+  } finally {
+    isLoading.value = false; // 完成加载
+  }
+};
 
-// 用户文章数量柱状图的数据
+// 加载选中用户的文章
+const loadUserArticles = async (userId) => {
+  try {
+    const res = await api.getUserPapers(userId);
+    articles.value = res;
+  } catch (err) {
+    console.error('获取用户文章失败', err);
+  }
+};
+
+// 用户文章柱状图数据
 const articleChartData = computed(() => {
   return users.value.map(user => ({
-    label: user.name,
-    value: user.articles,
+    label: user.username,
+    value: user.paperCount
   }));
 });
 
-// 选中的用户的文章列表
+// 当前选中用户的文章（已过滤 userId）
 const selectedUserArticles = computed(() => {
   if (!selectedUser.value) return [];
   return articles.value.filter(article => article.userId === selectedUser.value.id);
 });
 
-// 分页数据
-const totalPages = computed(() => Math.ceil(users.value.length / pageSize));
+// 分页总页数
+const totalPages = computed(() => Math.ceil(total.value / pageSize));
 
-// 选择用户
+// 选中用户（并加载其文章）
 const selectUser = (user) => {
   selectedUser.value = user;
+  loadUserArticles(user.id);  // 加载文章
 };
 
-// 切换页面
+// 分页变化
 const changePage = (newPage) => {
   currentPage.value = newPage;
+  loadUserPaperStats();  // 更新用户列表
 };
 
-// 返回上一级
+// 返回上一页
 const goBack = () => {
-  selectedUser.value = null; // 清空选中的用户，回到用户列表
+  selectedUser.value = null;
 };
+
+// 初始化加载第一页用户论文统计
+onMounted(() => {
+  loadUserPaperStats();
+});
+
+// 监听分页变化，触发数据更新
+watch(currentPage, () => {
+  loadUserPaperStats();
+});
 </script>
+
 
 <style scoped>
 .article-management {

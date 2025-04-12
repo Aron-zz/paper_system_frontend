@@ -17,9 +17,8 @@
 </template>
 
 <script setup>
-import { defineEmits } from 'vue';
+import { defineEmits, defineProps } from 'vue';
 
-// 接收父组件传递的分页数据
 const props = defineProps({
   currentPage: {
     type: Number,
@@ -31,34 +30,11 @@ const props = defineProps({
   }
 });
 
-// 定义 emit 事件
-const emit = defineEmits();
+const emit = defineEmits(['change-page']);
 
-// 触发父组件的方法来更新当前页码
 const changePage = (newPage) => {
   if (newPage >= 1 && newPage <= props.totalPages) {
-    emit('update:currentPage', newPage);  // 更新当前页码
+    emit('change-page', newPage); // ✅ 只发这个事件
   }
 };
 </script>
-
-<style scoped>
-.pagination {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-
-button:disabled {
-  opacity: 0.5;
-}
-
-button {
-  padding: 5px 10px;
-  cursor: pointer;
-}
-
-span {
-  font-weight: bold;
-}
-</style>
