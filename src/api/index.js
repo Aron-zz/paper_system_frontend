@@ -48,6 +48,8 @@ const api = {
 
   updateUserInfo: (user) => request.post('/api/user/update', user),
 
+
+
   // 上传头像
     uploadAvatar: (file, userId) => {
       const formData = new FormData();
@@ -65,6 +67,25 @@ const api = {
   getAllPapers: () => request.get('/api/paper/all'),
 
   getUserPapers: (userId) => request.get(`/api/paper/by-user/${userId}`),
+
+    // 删除论文
+    deletePaper: (paperId) => request.delete(`/api/paper/delete/${paperId}`),
+
+    // 更新论文
+    updatePaper: (paper) => request.put('/api/paper/update', paper),
+
+    // 新增论文
+    addPaper: (paper) => request.post('/api/paper/add', paper),  // 新增论文接口
+
+    // 新增论文并关联用户（包含作者顺序、贡献）
+    addUserPaper: (userId, paperData) =>
+      request.post(`/api/paper/${userId}/papers`, paperData),
+
+    // 根据用户ID和论文标题进行模糊查询
+    searchPapers: (userId, query) => request.get('/api/paper/search', {
+      params: { userId, query }
+    }),
+
 
   // 每个用户发表的论文数
   getUsersWithPaperCount: (page = 1, size = 10) =>

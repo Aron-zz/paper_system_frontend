@@ -106,6 +106,7 @@ onUnmounted(() => {
   left: 0;
   bottom: 0;
   transition: width 0.3s ease;
+  z-index: 100; /* 确保侧边栏在内容上方 */
 }
 
 .sidebar.collapsed {
@@ -116,8 +117,10 @@ onUnmounted(() => {
   flex-grow: 1;
   display: flex;
   flex-direction: column;
-  margin-left: 250px; /* 留出侧边栏的空间 */
+  margin-left: 250px; /* 默认留出侧边栏的空间 */
   transition: margin-left 0.3s ease; /* 平滑过渡 */
+  padding: 20px;
+  overflow-y: auto;
 }
 
 .content {
@@ -154,6 +157,20 @@ onUnmounted(() => {
   }
 }
 
+@media (max-width: 992px) {
+  .sidebar {
+    width: 180px; /* 更小屏幕时侧边栏宽度 */
+  }
+
+  .main-content {
+    margin-left: 180px; /* 更小屏幕时调整主内容区域宽度 */
+  }
+
+  .main-content.collapsed {
+    margin-left: 60px; /* 折叠时的宽度 */
+  }
+}
+
 @media (max-width: 768px) {
   .sidebar {
     width: 160px; /* 小屏幕时侧边栏宽度 */
@@ -181,5 +198,6 @@ onUnmounted(() => {
     margin-left: 50px; /* 折叠时的宽度 */
   }
 }
+
 </style>
 

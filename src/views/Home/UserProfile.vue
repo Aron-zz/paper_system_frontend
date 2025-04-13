@@ -2,10 +2,10 @@
   <div class="user-profile">
     <div class="profile-header">
       <div class="avatar">
-            <img :src="avatarUrl" alt="User Avatar" />
-            <input type="file" id="file-upload" @change="handleAvatarChange" accept="image/*" />
-            <button @click="triggerFileInput">上传头像</button>
-          </div>
+        <img :src="avatarUrl" alt="User Avatar" />
+        <input type="file" id="file-upload" @change="handleAvatarChange" accept="image/*" />
+        <button @click="triggerFileInput">上传头像</button>
+      </div>
       <div class="user-info">
         <h2>{{ user.username }}</h2>
         <p>{{ user.email }}</p>
@@ -40,11 +40,26 @@
         <button type="submit">保存更改</button>
       </form>
     </div>
+
+    <!-- 日历部分 -->
+    <div class="calendar-section">
+      <vue-cal
+        v-model="calendarDate"
+        :events="events"
+        :disable-views="['year', 'month']"
+        :event-color="event => event.color || '#4caf50'"
+        :event-text-color="event => event.textColor || '#fff'"
+        :on-event-click="onEventClick"
+      />
+    </div>
   </div>
 </template>
 
+
 <script setup>
 import { ref, onMounted } from 'vue'
+import VueCal from 'vue-cal';  // 引入 vue-cal 组件
+import 'vue-cal/dist/vuecal.css';  // 引入样式
 import api from '../../api/index.js'
 import { useRoute } from 'vue-router'
 
@@ -100,12 +115,14 @@ const handleAvatarChange = (event) => {
 // 提交更新
 const handleSubmit = async () => {
   try {
+
     // 如果选择了新头像，先上传头像
     if (selectedFile.value) {
       const res = await api.uploadAvatar(selectedFile.value, user.value.id)
 
+      console.log('返回的头像信息'+res)
       // 设置返回的头像 URL 到 user.value.avatar 中
-      user.value.avatar = res.avatarUrl || ''
+      user.value.avatarUrl = res || ''
     }
 
     // 更新用户信息（包括 avatar 字段）
@@ -373,6 +390,38 @@ input[type="file"] {
   background-color: #4caf50;
 }
 
+.calendar-section {
+  margin-top: 20px;
+  width: 100%;
+  border-radius: 12px; /* 与其他部分统一圆角 */
+  background-color: #fafafa; /* 背景色与右侧编辑部分统一 */
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05); /* 统一阴影 */
+  height: 100%; /* 确保容器的高度充满可用空间 */
+  min-height: 500px; /* 设置更大的最小高度，确保日历能完全显示 */
+  padding: 20px; /* 内间距 */
+  overflow: hidden; /* 防止内容溢出 */
+}
+
+/* 暗主题下的日历部分 */
+.dark-theme .calendar-section {
+  background-color: #444; /* 背景色变暗 */
+  color: #eee; /* 字体颜色变亮 */
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1); /* 阴影更深 */
+}
+
+/* 日历的自适应设置 */
+.vue-cal {
+  width: 100%; /* 确保日历宽度填充父容器 */
+  height: 100%; /* 高度自适应 */
+  min-height: 500px; /* 确保日历至少有 500px 高，防止 week 显示不全 */
+}
+
+/* 针对小屏幕的自适应 */
+@media (max-width: 768px) {
+  .calendar-section {
+    min-height: 400px; /* 确保在小屏幕时日历不会过大 */
+  }
+}
 
 </style>
 

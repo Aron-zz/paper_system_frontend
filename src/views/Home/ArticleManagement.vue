@@ -3,12 +3,12 @@
     <!-- 用户列表和柱状图部分，只有在未选择用户时显示 -->
     <div v-if="!selectedUser" class="left-panel">
       <h2>User Articles</h2>
+      <!-- 父组件模板部分修改 -->
       <UserArticleTable
         :users="users"
-        :current-page="currentPage"
-        :page-size="pageSize"
         @select-user="selectUser"
       />
+
 
       <Pagination
         :current-page="currentPage"
@@ -28,12 +28,22 @@
     <!-- 用户详情和文章信息部分，只有在选择用户后显示 -->
     <div v-if="selectedUser" class="user-details">
       <button @click="goBack" class="back-button cancel">Back to User List</button>
+      <!-- 用户详细信息部分 -->
       <div class="user-info">
-        <img :src="selectedUser.avatar" alt="Avatar" />
+        <img :src= "selectedUser.avatar" alt="User Avatar" />
         <h3>{{ selectedUser.name }}</h3>
-        <p>Articles: {{ selectedUser.articleCount }}</p>
+        <p><strong>Email:</strong> {{ selectedUser.email }}</p>
+        <p><strong>College:</strong> {{ selectedUser.organization }}</p>
+
       </div>
-      <article-list :articles="selectedUserArticles" />
+      <ArticleList
+        :articles="selectedUserArticles"
+        @add="handleAddArticle"
+        @edit="handleEditArticle"
+        @delete="handleDeleteArticle"
+      />
+
+
     </div>
   </div>
 </template>
@@ -73,9 +83,23 @@ const loadUserPaperStats = async () => {
 const loadUserArticles = async (userId) => {
   try {
     const res = await api.getUserPapers(userId);
+    console.log(JSON.stringify(res, null, 2));
+
     articles.value = res;
   } catch (err) {
     console.error('获取用户文章失败', err);
+  }
+};
+
+// 加载选中用户的详细信息
+const loadUserInfo = async (userId) => {
+  try {
+    console.log('当前选中的用户id：'+ userId);
+    const res = await api.getUserInfo(userId);  // 获取用户详细信息
+    selectedUser.value = { ...selectedUser.value, ...res };  // 合并返回的详细信息
+    console.log("合并后的用户信息：" + JSON.stringify(selectedUser.value, null, 2));
+  } catch (err) {
+    console.error('获取用户详细信息失败', err);
   }
 };
 
@@ -87,10 +111,9 @@ const articleChartData = computed(() => {
   }));
 });
 
-// 当前选中用户的文章（已过滤 userId）
+// 当前选中用户的文章（修改为只读计算属性）
 const selectedUserArticles = computed(() => {
-  if (!selectedUser.value) return [];
-  return articles.value.filter(article => article.userId === selectedUser.value.id);
+  return articles.value;
 });
 
 // 分页总页数
@@ -98,8 +121,10 @@ const totalPages = computed(() => Math.ceil(total.value / pageSize));
 
 // 选中用户（并加载其文章）
 const selectUser = (user) => {
+  console.log('选中的用户:', user);  // 添加这行来检查传入的 user 对象
   selectedUser.value = user;
-  loadUserArticles(user.id);  // 加载文章
+  loadUserInfo(user.userId);
+  loadUserArticles(user.userId);  // 加载文章
 };
 
 // 分页变化
@@ -122,6 +147,75 @@ onMounted(() => {
 watch(currentPage, () => {
   loadUserPaperStats();
 });
+
+const handleDeleteArticle = async (articleId) => {
+  try {
+    await api.deletePaper(articleId);
+    // 修改为直接更新 articles.value
+    articles.value = articles.value.filter(
+      article => article.id !== articleId
+    );
+
+    // 更新用户统计信息
+    const userIndex = users.value.findIndex(user => user.userId === selectedUser.value.userId);
+    if (userIndex !== -1) {
+      users.value[userIndex].paperCount--;
+      // 确保触发响应式更新
+      users.value = [...users.value];
+    }
+    alert('删除成功');
+  } catch (err) {
+    console.error('删除失败', err);
+    alert('删除失败');
+  }
+};
+
+const handleEditArticle = async (updatedArticle) => {
+  try {
+    await api.updatePaper(updatedArticle);
+    // 修改为直接更新 articles.value
+    articles.value = articles.value.map(article =>
+      article.id === updatedArticle.id ? updatedArticle : article
+    );
+    alert('更新成功');
+  } catch (err) {
+    console.error('更新失败', err);
+    alert('更新失败');
+  }
+};
+
+const handleAddArticle = async (newArticle) => {
+  try {
+    if (!selectedUser.value) {
+      throw new Error('请选择一个用户');
+    }
+
+    const userId = selectedUser.value.id;
+    const res = await api.addUserPaper(userId, newArticle);
+
+    if (res && res.paperId) {
+      const addedArticle = {
+        ...newArticle,
+        id: res.paperId
+      };
+
+      // 修改为直接更新 articles.value
+      articles.value = [...articles.value, addedArticle];
+
+      // 更新用户统计信息
+      const userIndex = users.value.findIndex(user => user.userId === selectedUser.value.userId);
+      if (userIndex !== -1) {
+        users.value[userIndex].paperCount++;
+        users.value = [...users.value]; // 确保响应式更新
+      }
+      alert('文章添加成功');
+    }
+  } catch (err) {
+    console.error("新增文章失败", err);
+    alert('新增文章失败');
+  }
+};
+
 </script>
 
 
