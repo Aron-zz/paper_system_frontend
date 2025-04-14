@@ -1,40 +1,39 @@
 <template>
-  <div class="user-management">
+  <div class="contact-management">
     <!-- 查询栏 -->
     <div class="search-bar">
       <input
         v-model="searchName"
         type="text"
         placeholder="Search by name"
-        @input="searchUser"
+        @input="searchContact"
       />
 
-     <!-- 添加用户按钮 -->
-       <button @click="addUser" class="primary">Add User</button>
+      <!-- 添加联系人按钮 -->
+      <button @click="addContact" class="primary">Add Contact</button>
     </div>
 
-    <!-- 用户列表 -->
-    <div class="user-list">
+    <!-- 联系人列表 -->
+    <div class="contact-list">
       <table>
         <thead>
           <tr>
             <th>Name</th>
+            <th>Phone</th>
             <th>Email</th>
-            <th>Gender</th>
-            <th>College</th>
+            <th>Relationship</th>
             <th>Actions</th>
           </tr>
         </thead>
         <tbody>
-          <tr v-for="user in pagedUsers" :key="user.id">
-            <td>{{ user.name }}</td>
-            <td>{{ user.email }}</td>
-            <td>{{ user.gender }}</td>
-            <td>{{ user.college }}</td>
+          <tr v-for="contact in pagedContacts" :key="contact.id">
+            <td>{{ contact.name }}</td>
+            <td>{{ contact.phone }}</td>
+            <td>{{ contact.email }}</td>
+            <td>{{ contact.relationship }}</td>
             <td>
-
-              <button :class="['primary', { 'dark-theme': isDarkMode }]" @click="editUser(user)">编辑</button>
-              <button :class="['secondary', { 'dark-theme': isDarkMode }]" @click="deleteUser(user.id)">删除</button>
+              <button :class="['primary', { 'dark-theme': isDarkMode }]" @click="editContact(contact)">Edit</button>
+              <button :class="['secondary', { 'dark-theme': isDarkMode }]" @click="deleteContact(contact.id)">Delete</button>
             </td>
           </tr>
         </tbody>
@@ -42,100 +41,135 @@
     </div>
 
     <!-- 分页 -->
-    <div class="pagination">
-      <button :disabled="currentPage === 1" @click="currentPage--" class="primary">Prev</button>
-      <span>Page {{ currentPage }} of {{ totalPages }}</span>
-      <button :disabled="currentPage === totalPages" @click="currentPage++" class="primary">Next</button>
-    </div>
+   <div class="pagination">
+     <button
+       :disabled="currentPage === 1"
+       @click="currentPage--; loadData();"
+       class="primary"
+     >
+       Prev
+     </button>
+     <span>Page {{ currentPage }} of {{ totalPages }}</span>
+     <button
+       :disabled="currentPage === totalPages"
+       @click="currentPage++; loadData();"
+       class="primary"
+     >
+       Next
+     </button>
+   </div>
 
-    <!-- 弹出窗口 - 编辑/添加用户 -->
-      <div v-if="isModalOpen" class="modal">
-        <div class="modal-content">
-          <h3>{{ isEditing ? 'Edit User' : 'Add User' }}</h3>
-          <form @submit.prevent="handleSubmit">
-            <label for="name">Name:</label>
-            <input v-model="currentUser.name" type="text" id="name" required />
+    <!-- 弹出窗口 - 编辑/添加联系人 -->
+    <div v-if="isModalOpen" class="modal">
+      <div class="modal-content">
+        <h3>{{ isEditing ? 'Edit Contact' : 'Add Contact' }}</h3>
+        <form @submit.prevent="handleSubmit">
+          <label for="name">Name:</label>
+          <input v-model="currentContact.name" type="text" id="name" required />
 
-            <label for="email">Email:</label>
-            <input v-model="currentUser.email" type="email" id="email" required />
+          <label for="phone">Phone:</label>
+          <input v-model="currentContact.phone" type="text" id="phone" />
 
-            <label for="gender">Gender:</label>
-            <select v-model="currentUser.gender">
-              <option value="Male">Male</option>
-              <option value="Female">Female</option>
-              <option value="Other">Other</option>
-            </select>
+          <label for="email">Email:</label>
+          <input v-model="currentContact.email" type="email" id="email" />
 
-            <label for="college">College:</label>
-            <input v-model="currentUser.college" type="text" id="college" required />
+          <label for="relationship">Relationship:</label>
+          <input v-model="currentContact.relationship" type="text" id="relationship" />
 
-            <button type="submit" class="primary">{{ isEditing ? 'Update' : 'Add' }}</button>
-            <button @click="closeModal" type="button" class="cancel">Cancel</button>
-          </form>
-        </div>
+          <button type="submit" class="primary">{{ isEditing ? 'Update' : 'Add' }}</button>
+          <button @click="closeModal" type="button" class="cancel">Cancel</button>
+        </form>
       </div>
-
+    </div>
   </div>
 </template>
 
 <script setup>
-import { ref, computed } from 'vue';
+import { ref, watch, computed, onMounted } from 'vue';
+import api from '../../api/index.js'; // 引入之前提供的 API 封装
 
-// 用户数据（模拟数据，实际项目中会从 API 获取）
-const users = ref([
-  { id: 1, name: 'John Doe', email: 'john.doe@example.com', gender: 'Male', college: 'Computer Science' },
-  { id: 2, name: 'Jane Smith', email: 'jane.smith@example.com', gender: 'Female', college: 'Engineering' },
-  { id: 3, name: 'Mary Johnson', email: 'mary.johnson@example.com', gender: 'Female', college: 'Mathematics' },
-  { id: 4, name: 'James Brown', email: 'james.brown@example.com', gender: 'Male', college: 'Physics' },
-  { id: 5, name: 'Patricia White', email: 'patricia.white@example.com', gender: 'Female', college: 'Biology' },
-  { id: 6, name: 'Michael Green', email: 'michael.green@example.com', gender: 'Male', college: 'Chemistry' },
-  { id: 7, name: 'Emily Clark', email: 'emily.clark@example.com', gender: 'Female', college: 'Philosophy' },
-]);
-
-// 管理数据
+// 状态管理
 const searchName = ref('');
 const currentPage = ref(1);
-const pageSize = 5; // 每页显示5个用户
+const pageSize = 5; // 每页显示5个联系人
 const isModalOpen = ref(false);
 const isEditing = ref(false);
-const currentUser = ref({
-  id: null,
+const currentContact = ref({
+  id: '',
+  userId: '',
   name: '',
+  phone: '',
   email: '',
-  gender: 'Male',
-  college: ''
+  relationship: ''
 });
 
-// 模拟删除
-const deleteUser = (id) => {
-  users.value = users.value.filter(user => user.id !== id);
+// 加载用户信息并验证 ID
+const userId = localStorage.getItem('id');
+
+
+// 获取联系人列表并分页
+const getContacts = async (page = currentPage.value, size = pageSize) => {
+  try {
+    const response = await api.getContactsByUserId(userId, page, size);
+    contacts.value = response.records;
+    currentPage.value = response.current;  // 这里同步后端的 current
+
+    totalPages.value = Math.ceil(response.total / pageSize);
+    console.log('返回获取的联系人信息:', response);
+  } catch (error) {
+    console.error('Error fetching contacts:', error);
+  }
 };
 
-// 按姓名模糊查询
-const searchUser = () => {
-  currentPage.value = 1; // 重置分页为第一页
+const searchContact = () => {
+  currentPage.value = 1;
+  // 调用搜索接口，而不是普通分页接口
+  loadSearchResults();
+};
+
+const loadSearchResults = async () => {
+  try {
+    const response = await api.searchContactsByName(
+      userId,
+      searchName.value, // 搜索关键词
+      currentPage.value,
+      pageSize
+    );
+    contacts.value = response.records;
+    totalPages.value = Math.ceil(response.total / pageSize);
+  } catch (error) {
+    console.error("搜索失败:", error);
+  }
+};
+
+// 删除联系人
+const deleteContact = async (id) => {
+  try {
+    console.log('发送删除请求 ID:', id); // 打印出要删除的 ID
+    await api.deleteContact(id);
+    getContacts(); // 删除成功后重新加载联系人列表
+  } catch (error) {
+    console.error('Error deleting contact:', error);
+  }
 };
 
 // 分页数据
-const pagedUsers = computed(() => {
-  const filteredUsers = users.value.filter(user => user.name.toLowerCase().includes(searchName.value.toLowerCase()));
-  return filteredUsers.slice((currentPage.value - 1) * pageSize, currentPage.value * pageSize);
-});
+const contacts = ref([]);
+const totalPages = ref(1);
 
-const totalPages = computed(() => {
-  const filteredUsers = users.value.filter(user => user.name.toLowerCase().includes(searchName.value.toLowerCase()));
-  return Math.ceil(filteredUsers.length / pageSize);
+const pagedContacts = computed(() => {
+  return contacts.value.slice((currentPage.value - 1) * pageSize, currentPage.value * pageSize);
 });
 
 // 打开编辑/添加窗口
-const editUser = (user) => {
-  currentUser.value = { ...user };
+const editContact = (contact) => {
+  currentContact.value = { ...contact };
   isEditing.value = true;
   isModalOpen.value = true;
 };
 
-const addUser = () => {
-  currentUser.value = { id: null, name: '', email: '', gender: 'Male', college: '' };
+const addContact = () => {
+  currentContact.value = { id: '', name: '', phone: '', email: '', relationship: '' };
   isEditing.value = false;
   isModalOpen.value = true;
 };
@@ -146,25 +180,55 @@ const closeModal = () => {
   resetForm();
 };
 
-// 提交表单
-const handleSubmit = () => {
-  if (isEditing.value) {
-    // 更新用户
-    const index = users.value.findIndex(user => user.id === currentUser.value.id);
-    users.value[index] = { ...currentUser.value };
-  } else {
-    // 添加用户
-    currentUser.value.id = users.value.length + 1; // 简单模拟ID
-    users.value.push({ ...currentUser.value });
+// 提交表单（更新或添加联系人）
+const handleSubmit = async () => {
+  try {
+  // 在添加联系人时，排除 id 字段
+    currentContact.value.userId = userId;
+    const contactData = { ...currentContact.value };
+    if (!isEditing.value) {
+      delete contactData.id;  // 添加联系人时删除 id 字段
+    }
+
+    if (isEditing.value) {
+
+      await api.updateContact(contactData); // 更新联系人
+    } else {
+
+      await api.addContact(contactData); // 添加联系人
+    }
+    closeModal();
+    getContacts(); // 提交后重新加载联系人列表
+  } catch (error) {
+    console.error('Error submitting contact:', error);
   }
-  closeModal();
 };
+
+const loadData = async () => {
+  if (searchName.value) {
+    await loadSearchResults(); // 如果有搜索词，调用搜索接口
+  } else {
+    await getContacts(); // 否则调用普通分页接口
+  }
+};
+
+// 监听 currentPage，自动加载数据
+watch(currentPage, (newPage) => {
+  loadData(); // 翻页时调用统一的数据加载方法
+});
+
 
 // 重置表单
 const resetForm = () => {
-  currentUser.value = { id: null, name: '', email: '', gender: 'Male', college: '' };
+  currentContact.value = { id: null, name: '', phone: '', email: '', relationship: '' };
 };
+
+onMounted(() => {
+  getContacts(currentPage.value);
+});
+
 </script>
+
 
 <style scoped>
 /* 用户管理页面的基本布局 */

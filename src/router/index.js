@@ -1,6 +1,6 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import Home from '../views/Home/Home.vue'
-import UserManagement from '../views/Home/UserManagement.vue'
+import ContactManagement from '../views/Home/ContactManagement.vue'
 import ArticleManagement from '../views/Home/ArticleManagement.vue'
 import UserProfile from '../views/Home/UserProfile.vue'
 
@@ -22,7 +22,7 @@ const routes = [
     children: [
       { path: '', redirect: 'user-profile' }, // 默认跳转到个人主页
       { path: 'user-profile', component: UserProfile },
-      { path: 'user-management', component: UserManagement },
+      { path: 'contact-management', component: ContactManagement },
       { path: 'article-management', component: ArticleManagement },
     ],
   },

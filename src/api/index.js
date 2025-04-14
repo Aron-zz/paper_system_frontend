@@ -92,8 +92,30 @@ const api = {
     request.get('/api/user-paper/user-count', {
       params: { page, size }
     }),
+
+
+// 1. 根据 userId 分页查询联系人
+getContactsByUserId: (userId, page, size) =>
+  request.get(`/api/contacts/by-user/${userId}`, {
+    params: { page, size }
+  }),
+
+// 2. 模糊搜索联系人姓名（userId + name）
+searchContactsByName: (userId, keyword, page, size) =>
+  request.get('/api/contacts/search', {
+    params: { userId, keyword, page, size }
+  }),
+
+// 3. 新增联系人
+addContact: (contact) => request.post('/api/contacts', contact),
+
+// 4. 修改联系人
+updateContact: (contact) => request.put('/api/contacts', contact),
+
+// 5. 删除联系人
+deleteContact: (contactId) =>
+  request.delete(`/api/contacts/${contactId}`)
+
 };
-
-
 
 export default api;

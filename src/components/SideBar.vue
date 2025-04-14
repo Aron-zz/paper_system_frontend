@@ -2,7 +2,7 @@
   <div :class="{ dark: isDarkMode, collapsed: collapsed }" class="sidebar">
     <ul>
       <li @click="goTo('user-profile')">个人主页</li>
-      <li @click="goTo('user-management')">联系人管理</li>
+      <li @click="goTo('contact-management')">联系人管理</li>
       <li @click="goTo('article-management')">文章管理</li>
     </ul>
     <ThemeToggle @toggle="toggleTheme" />
