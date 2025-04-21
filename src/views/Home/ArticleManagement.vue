@@ -1,453 +1,538 @@
 <template>
   <div class="article-management">
-    <!-- 用户列表和柱状图部分，只有在未选择用户时显示 -->
-    <div v-if="!selectedUser" class="left-panel">
-      <h2>User Articles</h2>
-      <!-- 父组件模板部分修改 -->
-      <UserArticleTable
-        :users="users"
-        @select-user="selectUser"
-      />
+    <!-- 用户列表和统计图表部分 -->
+    <div v-if="!selectedUser" class="main-content">
+      <el-row :gutter="20">
+        <!-- 用户列表 -->
+        <el-col :span="12">
+          <el-card>
+            <template #header>
+              <div class="card-header">
+                <h2>论文统计</h2>
+                <el-button 
+                  type="primary" 
+                  @click="refreshData"
+                  :loading="isLoading"
+                >
+                  <el-icon><Refresh /></el-icon> Refresh
+                </el-button>
+              </div>
+            </template>
+            <UserArticleTable 
+              :users="allUsers" 
+              @select-user="selectUser"
+              @page-change="handlePageChange"
+              @update-visible-users="handleVisibleUsersUpdate"
+              :loading="isLoading"
+            />
+            <el-pagination
+              v-model:current-page="currentPage"
+              :page-size="pageSize"
+              :total="total"
+              layout="prev, pager, next, sizes"
+              :page-sizes="[5, 10, 20, 50]"
+              @current-change="changePage"
+              @size-change="handleSizeChange"
+              class="pagination"
+            />
+          </el-card>
+        </el-col>
 
-
-      <Pagination
-        :current-page="currentPage"
-        :total-pages="totalPages"
-        @change-page="changePage"
-      />
+        <!-- 统计图表 -->
+        <el-col :span="12">
+          <el-card>
+            <template #header>
+              <div class="chart-header">
+                <h2>Article Statistics</h2>
+                <el-statistic 
+                  title="Total Articles" 
+                  :value="totalArticles" 
+                  class="total-statistic"
+                />
+              </div>
+            </template>
+            <EChartComponent 
+              v-if="currentPageUsers.length > 0" 
+              :options="chartOptions"
+              class="chart-container"
+              :key="chartKey"
+            />
+            <el-empty v-else description="No users available" />
+          </el-card>
+        </el-col>
+      </el-row>
     </div>
 
-    <div v-if="!selectedUser" class="right-panel">
-      <h2>Article Statistics</h2>
-      <!-- 只有在有数据时显示图表 -->
-      <article-chart v-if="articleChartData.length > 0" :data="articleChartData" />
-      <p v-else v-if="users.length === 0">No users available</p>
-      <p v-else>Loading...</p> <!-- 加载中的状态 -->
-    </div>
-
-    <!-- 用户详情和文章信息部分，只有在选择用户后显示 -->
+    <!-- 用户详情和文章列表 -->
     <div v-if="selectedUser" class="user-details">
-      <button @click="goBack" class="back-button cancel">Back to User List</button>
-      <!-- 用户详细信息部分 -->
-      <div class="user-info">
-        <img :src= "selectedUser.avatar" alt="User Avatar" />
-        <h3>{{ selectedUser.name }}</h3>
-        <p><strong>Email:</strong> {{ selectedUser.email }}</p>
-        <p><strong>College:</strong> {{ selectedUser.organization }}</p>
+      <el-card>
+        <template #header>
+          <div class="user-header">
+            <el-button 
+              type="info" 
+              @click="goBack" 
+              class="back-button"
+            >
+              <el-icon><ArrowLeft /></el-icon> 返回文章管理
+            </el-button>
+            
+          </div>
+        </template>
 
-      </div>
-      <ArticleList
-        :articles="selectedUserArticles"
-        @add="handleAddArticle"
-        @edit="handleEditArticle"
-        @delete="handleDeleteArticle"
-      />
+        <!-- 用户信息 -->
+        <div class="user-info">
+          <el-avatar :size="80" :src="selectedUser.avatarUrl || '/default-avatar.png'" />
+          <div class="user-meta">
+            <h3>{{ selectedUser.name }}</h3>
+            <p>
+              <el-icon><Message /></el-icon> 
+              {{ selectedUser.email }}
+            </p>
+            <p>
+              <el-icon><OfficeBuilding /></el-icon> 
+              {{ selectedUser.organization || 'No organization' }}
+            </p>
+            <p>
+              <el-icon><Document /></el-icon>
+              Total Articles: {{ selectedUser.paperCount || 0 }}
+            </p>
+          </div>
+        </div>
 
-
+        <!-- 文章列表 -->
+        <ArticleList
+          :articles="selectedUserArticles"
+          :loading="articlesLoading"
+          @add="handleAddArticle"
+          @edit="handleEditArticle"
+          @delete="handleDeleteArticle"
+        />
+      </el-card>
     </div>
+
+    <!-- 添加/编辑文章对话框 -->
+    <el-dialog
+      v-model="articleDialogVisible"
+      :title="isEditingArticle ? 'Edit Article' : 'Add Article'"
+      width="50%"
+    >
+      <ArticleForm
+        v-if="articleDialogVisible"
+        :article="currentArticle"
+        @submit="handleArticleSubmit"
+        @cancel="articleDialogVisible = false"
+      />
+    </el-dialog>
   </div>
 </template>
 
 <script setup>
-import { ref, computed, onMounted, watch } from 'vue';
-import UserArticleTable from '../../components/UserArticleTable.vue';
-import ArticleChart from '../../components/ArticleChart.vue';
-import ArticleList from '../../components/ArticleList.vue';
-import Pagination from '../../components/Pagination.vue';
-import api from '../../api/index.js';
+import { ref, computed, onMounted, watch } from 'vue'
+import { ElMessage, ElMessageBox } from 'element-plus'
+import { 
+  ArrowLeft, Message, OfficeBuilding, Document, Refresh 
+} from '@element-plus/icons-vue'
+import * as echarts from 'echarts'
+import UserArticleTable from '../../components/UserArticleTable.vue'
+import ArticleList from '../../components/ArticleList.vue'
+import ArticleForm from '../../components/ArticleForm.vue'
+import EChartComponent from '../../components/EChartComponent.vue'
+import api from '../../api/index.js'
 
-const users = ref([]);         // 当前页用户及其文章数量
-const articles = ref([]);      // 选中用户的文章
-const total = ref(0);          // 总用户数
-const currentPage = ref(1);
-const pageSize = 3;            // 每页显示用户数
-const selectedUser = ref(null); // 当前选中的用户
-const isLoading = ref(false);   // 加载状态
-
-// 加载用户统计信息
-const loadUserPaperStats = async () => {
-  isLoading.value = true; // 开始加载
-  try {
-    const res = await api.getUsersWithPaperCount(currentPage.value, pageSize);
-    users.value = res.records;
-    total.value = res.total;
-  } catch (err) {
-    console.error('加载失败', err);
-    users.value = [];  // 如果加载失败，清空用户列表
-  } finally {
-    isLoading.value = false; // 完成加载
-  }
-};
-
-// 加载选中用户的文章
-const loadUserArticles = async (userId) => {
-  try {
-    const res = await api.getUserPapers(userId);
-    console.log(JSON.stringify(res, null, 2));
-
-    articles.value = res;
-  } catch (err) {
-    console.error('获取用户文章失败', err);
-  }
-};
-
-// 加载选中用户的详细信息
-const loadUserInfo = async (userId) => {
-  try {
-    console.log('当前选中的用户id：'+ userId);
-    const res = await api.getUserInfo(userId);  // 获取用户详细信息
-    selectedUser.value = { ...selectedUser.value, ...res };  // 合并返回的详细信息
-    console.log("合并后的用户信息：" + JSON.stringify(selectedUser.value, null, 2));
-  } catch (err) {
-    console.error('获取用户详细信息失败', err);
-  }
-};
-
-// 用户文章柱状图数据
-const articleChartData = computed(() => {
-  return users.value.map(user => ({
-    label: user.username,
-    value: user.paperCount
-  }));
-});
-
-// 当前选中用户的文章（修改为只读计算属性）
-const selectedUserArticles = computed(() => {
-  return articles.value;
-});
-
-// 分页总页数
-const totalPages = computed(() => Math.ceil(total.value / pageSize));
-
-// 选中用户（并加载其文章）
-const selectUser = (user) => {
-  console.log('选中的用户:', user);  // 添加这行来检查传入的 user 对象
-  selectedUser.value = user;
-  loadUserInfo(user.userId);
-  loadUserArticles(user.userId);  // 加载文章
-};
-
-// 分页变化
-const changePage = (newPage) => {
-  currentPage.value = newPage;
-  loadUserPaperStats();  // 更新用户列表
-};
-
-// 返回上一页
-const goBack = () => {
-  selectedUser.value = null;
-};
-
-// 初始化加载第一页用户论文统计
-onMounted(() => {
-  loadUserPaperStats();
-});
-
-// 监听分页变化，触发数据更新
-watch(currentPage, () => {
-  loadUserPaperStats();
-});
-
-const handleDeleteArticle = async (articleId) => {
-  try {
-    await api.deletePaper(articleId);
-    // 修改为直接更新 articles.value
-    articles.value = articles.value.filter(
-      article => article.id !== articleId
-    );
-
-    // 更新用户统计信息
-    const userIndex = users.value.findIndex(user => user.userId === selectedUser.value.userId);
-    if (userIndex !== -1) {
-      users.value[userIndex].paperCount--;
-      // 确保触发响应式更新
-      users.value = [...users.value];
-    }
-    alert('删除成功');
-  } catch (err) {
-    console.error('删除失败', err);
-    alert('删除失败');
-  }
-};
-
-const handleEditArticle = async (updatedArticle) => {
-  try {
-    await api.updatePaper(updatedArticle);
-    // 修改为直接更新 articles.value
-    articles.value = articles.value.map(article =>
-      article.id === updatedArticle.id ? updatedArticle : article
-    );
-    alert('更新成功');
-  } catch (err) {
-    console.error('更新失败', err);
-    alert('更新失败');
-  }
-};
-
-const handleAddArticle = async (newArticle) => {
-  try {
-    if (!selectedUser.value) {
-      throw new Error('请选择一个用户');
-    }
-
-    const userId = selectedUser.value.id;
-    const res = await api.addUserPaper(userId, newArticle);
-
-    if (res && res.paperId) {
-      const addedArticle = {
-        ...newArticle,
-        id: res.paperId
-      };
-
-      // 修改为直接更新 articles.value
-      articles.value = [...articles.value, addedArticle];
-
-      // 更新用户统计信息
-      const userIndex = users.value.findIndex(user => user.userId === selectedUser.value.userId);
-      if (userIndex !== -1) {
-        users.value[userIndex].paperCount++;
-        users.value = [...users.value]; // 确保响应式更新
-      }
-      alert('文章添加成功');
-    }
-  } catch (err) {
-    console.error("新增文章失败", err);
-    alert('新增文章失败');
-  }
-};
-
-</script>
+// 状态管理
+const users = ref([])
+const allUsers = ref([]) // 存储所有用户数据
+const articles = ref([])
+const total = ref(0)
+const currentPage = ref(1)
+const pageSize = ref(10)
+const selectedUser = ref(null)
+const isLoading = ref(false)
+const articlesLoading = ref(false)
+const articleDialogVisible = ref(false)
+const currentArticle = ref({})
+const isEditingArticle = ref(false)
+const chartKey = ref(0) // 用于强制重新渲染图表
 
 
-<style scoped>
-.article-management {
-  padding: 20px;
-  display: flex;
-  gap: 20px;
-  flex-wrap: wrap;
+const visibleUsers = ref([])
+
+const handleVisibleUsersUpdate = (users) => {
+  visibleUsers.value = users
+  chartKey.value++  // 每次用户变化，强制刷新一次图表
 }
 
-.left-panel,
-.right-panel {
-  flex: 1;
-  background-color: #f9f9f9;
+
+// 计算当前页显示的用户
+const currentPageUsers = computed(() => visibleUsers.value)
+
+
+// 计算属性
+const selectedUserArticles = computed(() => articles.value)
+const totalPages = computed(() => Math.ceil(total.value / pageSize.value))
+const totalArticles = computed(() => 
+  allUsers.value.reduce((sum, user) => sum + (user.paperCount || 0), 0)
+)
+
+const chartOptions = computed(() => ({
+  tooltip: {
+    trigger: 'axis',
+    axisPointer: {
+      type: 'shadow'
+    },
+    formatter: '{b}: {c} articles'
+  },
+  grid: {
+    left: '3%',
+    right: '4%',
+    bottom: '3%',
+    containLabel: true
+  },
+  xAxis: {
+    type: 'category',
+    data: currentPageUsers.value.map(user => user.username),
+    axisLabel: {
+      rotate: 45,
+      interval: 0,
+      formatter: (value) => {
+        return value.length > 8 ? value.substring(0, 6) + '...' : value
+      }
+    }
+  },
+  yAxis: {
+    type: 'value',
+    name: 'Article Count',
+    minInterval: 1
+  },
+  series: [{
+    name: 'Articles',
+    type: 'bar',
+    barWidth: '60%',
+    data: currentPageUsers.value.map(user => user.paperCount),
+    itemStyle: {
+      color: '#83bff6',
+      borderRadius: [4, 4, 0, 0]
+    },
+    label: {
+      show: true,
+      position: 'top'
+    }
+  }]
+}))
+
+watch(currentPageUsers, (val) => {
+  console.log('currentPageUsers:', val)
+})
+
+
+// 加载用户数据
+const loadUserPaperStats = async () => {
+  isLoading.value = true
+  try {
+    const res = await api.getUsersWithPaperCount(currentPage.value, pageSize.value)
+    allUsers.value = res.records || [] // 存储所有用户数据
+    users.value = [...allUsers.value] // 复制一份用于分页
+    total.value = res.total || 0
+    // 强制图表重新渲染
+    chartKey.value++
+  } catch (err) {
+    ElMessage.error('Failed to load user data')
+    console.error('Error loading user stats:', err)
+  } finally {
+    isLoading.value = false
+  }
+}
+
+// 加载用户文章
+const loadUserArticles = async (userId) => {
+  articlesLoading.value = true
+  try {
+    const res = await api.getUserPapers(userId)
+    articles.value = res || []
+  } catch (err) {
+    ElMessage.error('Failed to load articles')
+    console.error('Error loading articles:', err)
+  } finally {
+    articlesLoading.value = false
+  }
+}
+
+// 加载用户详情
+const loadUserInfo = async (userId) => {
+  try {
+    const res = await api.getUserInfo(userId)
+    selectedUser.value = { 
+      ...selectedUser.value, 
+      ...res,
+      avatar: res.avatar || '/default-avatar.png'
+    }
+  } catch (err) {
+    ElMessage.error('Failed to load user info')
+    console.error('Error loading user info:', err)
+  }
+}
+
+// 选择用户
+const selectUser = (user) => {
+  selectedUser.value = user
+  loadUserInfo(user.userId)
+  loadUserArticles(user.userId)
+}
+
+// 分页变化
+const changePage = (page) => {
+  currentPage.value = page
+  // 不需要重新加载数据，因为我们已经有所有数据
+  chartKey.value++ // 强制图表更新
+}
+
+// 每页大小变化
+const handleSizeChange = (size) => {
+  pageSize.value = size
+  currentPage.value = 1 // 重置到第一页
+  chartKey.value++ // 强制图表更新
+}
+
+// 刷新数据
+const refreshData = () => {
+  if (selectedUser.value) {
+    loadUserInfo(selectedUser.value.userId)
+    loadUserArticles(selectedUser.value.userId)
+  } else {
+    loadUserPaperStats()
+  }
+}
+
+// 返回用户列表
+const goBack = () => {
+  selectedUser.value = null
+}
+
+// 删除文章
+const handleDeleteArticle = async (articleId) => {
+  try {
+    await ElMessageBox.confirm(
+      'Are you sure to delete this article?', 
+      'Warning', 
+      {
+        confirmButtonText: 'Confirm',
+        cancelButtonText: 'Cancel',
+        type: 'warning'
+      }
+    )
+    
+    await api.deletePaper(articleId)
+    articles.value = articles.value.filter(article => article.id !== articleId)
+    
+    // 更新用户统计
+    const userIndex = allUsers.value.findIndex(u => u.userId === selectedUser.value.userId)
+    if (userIndex !== -1) {
+      allUsers.value[userIndex].paperCount--
+      users.value = [...allUsers.value]
+      chartKey.value++
+    }
+    
+    ElMessage.success('Article deleted successfully')
+  } catch (err) {
+    if (err !== 'cancel') {
+      ElMessage.error('Delete failed')
+      console.error('Error deleting article:', err)
+    }
+  }
+}
+
+// 编辑文章
+const handleEditArticle = (article) => {
+  currentArticle.value = { ...article }
+  isEditingArticle.value = true
+  articleDialogVisible.value = true
+}
+
+// 添加文章
+const handleAddArticle = () => {
+  currentArticle.value = {
+    title: '',
+    content: '',
+    status: 'draft',
+    userId: selectedUser.value.userId
+  }
+  isEditingArticle.value = false
+  articleDialogVisible.value = true
+}
+
+// 提交文章表单
+const handleArticleSubmit = async (articleData) => {
+  try {
+    if (isEditingArticle.value) {
+      await api.updatePaper(articleData)
+      articles.value = articles.value.map(a => 
+        a.id === articleData.id ? articleData : a
+      )
+      ElMessage.success('Article updated successfully')
+    } else {
+      const res = await api.addUserPaper(selectedUser.value.userId, articleData)
+      const newArticle = { ...articleData, id: res.paperId }
+      articles.value = [...articles.value, newArticle]
+      
+      // 更新用户统计
+      const userIndex = allUsers.value.findIndex(u => u.userId === selectedUser.value.userId)
+      if (userIndex !== -1) {
+        allUsers.value[userIndex].paperCount++
+        users.value = [...allUsers.value]
+        chartKey.value++
+      }
+      
+      ElMessage.success('Article added successfully')
+    }
+    articleDialogVisible.value = false
+  } catch (err) {
+    ElMessage.error('Operation failed')
+    console.error('Error submitting article:', err)
+  }
+}
+
+// 分页变化处理
+const handlePageChange = ({ currentPage, pageSize }) => {
+  currentPage.value = currentPage
+  pageSize.value = pageSize
+  chartKey.value++ // 强制更新图表
+}
+
+// 生命周期钩子
+onMounted(() => {
+  loadUserPaperStats()
+})
+</script>
+
+<style scoped>
+/* 保持原有的样式不变 */
+.article-management {
   padding: 20px;
-  border-radius: 6px;
+  max-width: 1400px;
+  margin: 0 auto;
+}
+
+.main-content {
+  display: flex;
+  gap: 20px;
 }
 
 .user-details {
-  flex: 1 1 100%;
-  background-color: #f9f9f9;
-  padding: 20px;
-  border-radius: 6px;
+  width: 100%;
+}
+
+.card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.user-header {
+  display: flex;
+  align-items: center;
+  gap: 16px;
 }
 
 .user-info {
   display: flex;
   align-items: center;
-  gap: 16px;
-  margin-bottom: 20px;
+  gap: 20px;
+  margin-bottom: 24px;
+  padding: 16px;
+  background-color: var(--el-bg-color-page);
+  border-radius: 8px;
 }
 
-.user-info img {
-  width: 60px;
-  height: 60px;
-  border-radius: 50%;
+.user-meta {
+  flex: 1;
 }
 
-/* 输入框样式 */
-.search-bar input {
-  padding: 8px;
+.user-meta h3 {
+  margin: 0 0 8px 0;
+  font-size: 20px;
+  font-weight: 600;
+}
+
+.user-meta p {
+  margin: 6px 0;
+  color: var(--el-text-color-secondary);
+  display: flex;
+  align-items: center;
+  gap: 8px;
   font-size: 14px;
-  width: 200px;
-  margin-bottom: 20px;
 }
 
-/* 表格样式 */
-.article-list table {
-  width: 100%;
-  border-collapse: collapse;
-}
-
-.article-list th,
-.article-list td {
-  padding: 10px;
-  text-align: left;
-  border-top: 1px solid #ddd;
-}
-
-.article-list th {
-  background-color: #f5f5f5;
-}
-
-/* 分页样式 */
 .pagination {
-  margin-top: 20px;
-  text-align: center;
-}
-
-.pagination button {
-  padding: 6px 12px;
-  font-size: 14px;
-  cursor: pointer;
-  transition: background-color 0.3s ease, transform 0.2s ease, opacity 0.3s ease;
-  border: none;
-  border-radius: 4px;
-  margin: 0 4px;
-}
-
-/* 模态框样式 */
-.modal {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: rgba(0, 0, 0, 0.5);
+  margin-top: 24px;
   display: flex;
   justify-content: center;
+}
+
+.back-button {
+  margin-bottom: 16px;
+}
+
+.chart-header {
+  display: flex;
+  justify-content: space-between;
   align-items: center;
+  margin-bottom: 16px;
 }
 
-.modal-content {
-  background: white;
-  padding: 20px;
-  border-radius: 6px;
-  width: 400px;
+.chart-header h2 {
+  margin: 0;
 }
 
-.modal-content h3 {
+.total-statistic {
+  margin-left: 16px;
+}
+
+.chart-container {
+  width: 100%;
+  height: 350px;
+  min-height: 350px;
+}
+
+.el-card {
   margin-bottom: 20px;
 }
 
-.modal-content label {
-  display: block;
-  margin-bottom: 8px;
+/* 响应式调整 */
+@media (max-width: 992px) {
+  .main-content {
+    flex-direction: column;
+  }
+  
+  .el-col {
+    width: 100%;
+    max-width: 100%;
+  }
+  
+  .chart-container {
+    height: 300px;
+  }
 }
 
-.modal-content input,
-.modal-content select {
-  width: 100%;
-  padding: 8px;
-  margin-bottom: 10px;
-  border: 1px solid #ccc;
-  border-radius: 4px;
-}
-
-/* 按钮统一样式 */
-button,
-button.primary,
-button.secondary,
-button.cancel,
-.back-button {
-  padding: 10px 20px;
-  font-size: 14px;
-  cursor: pointer;
-  border: none;
-  border-radius: 4px;
-  transition: background-color 0.3s ease, transform 0.2s ease, opacity 0.3s ease;
-}
-
-/* 各类按钮颜色 */
-button.primary {
-  background-color: #4caf50;
-  color: white;
-}
-
-button.secondary {
-  background-color: #f44336;
-  color: white;
-}
-
-button.cancel,
-.back-button {
-  background-color: #ccc;
-  color: #333;
-}
-
-/* 悬停效果（亮色主题） */
-button:hover,
-button.primary:hover,
-button.secondary:hover,
-button.cancel:hover,
-.back-button:hover {
-  opacity: 0.8;
-  transform: translateY(-2px);
-}
-
-/* 禁用状态 */
-button:disabled {
-  background-color: #f0f0f0;
-  cursor: not-allowed;
-  opacity: 0.5;
-}
-
-/* 暗模式 */
-.dark-theme .article-management {
-  background-color: #444;
-  color: #eee;
-}
-
-.dark-theme .left-panel,
-.dark-theme .right-panel,
-.dark-theme .user-details {
-  background-color: #333;
-  color: white;
-}
-
-.dark-theme .article-list th {
-  background-color: #555;
-}
-
-.dark-theme .article-list td {
-  background-color: #444;
-  border-top: 1px solid #555;
-}
-
-/* 按钮暗模式颜色 */
-.dark-theme button.primary {
-  background-color: #222;
-  color: white;
-}
-
-.dark-theme button.secondary {
-  background-color: #d32f2f;
-  color: white;
-}
-
-.dark-theme button.cancel,
-.dark-theme .back-button {
-  background-color: #888;
-  color: white;
-}
-
-/* 按钮悬停（暗模式） */
-.dark-theme button:hover,
-.dark-theme button.primary:hover,
-.dark-theme button.secondary:hover,
-.dark-theme button.cancel:hover,
-.dark-theme .back-button:hover {
-  opacity: 0.8;
-  transform: translateY(-2px);
-}
-
-/* 输入框暗模式 */
-.dark-theme input,
-.dark-theme select {
-  background-color: #444;
-  color: white;
-  border: 1px solid #555;
-}
-
-.dark-theme input:focus,
-.dark-theme select:focus {
-  border-color: #4caf50;
-  box-shadow: 0 0 5px rgba(76, 175, 80, 0.8);
+@media (max-width: 768px) {
+  .user-info {
+    flex-direction: column;
+    text-align: center;
+  }
+  
+  .chart-header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  
+  .total-statistic {
+    margin-left: 0;
+    margin-top: 8px;
+  }
+  
+  .card-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 12px;
+  }
 }
 </style>
-
-
-
-
-
-

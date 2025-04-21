@@ -1,35 +1,56 @@
 <template>
   <div class="auth-container">
-    <div class="form-card">
+    <el-card class="form-card">
       <h2>找回密码</h2>
-      <form @submit.prevent="handleReset">
-        <input v-model="form.email" type="email" placeholder="邮箱" required />
-        <div class="email-code-row">
-          <input v-model="form.code" placeholder="验证码" required />
-          <button type="button" @click="sendCode" :disabled="countdown > 0">
-            {{ countdown > 0 ? `${countdown}s` : '发送验证码' }}
-          </button>
-        </div>
-        <input v-model="form.newPassword" type="password" placeholder="新密码" required />
-        <input v-model="form.confirmPassword" type="password" placeholder="确认新密码" required />
-        <button type="submit">提交</button>
-      </form>
+      <el-form @submit.prevent="handleReset">
+        <el-form-item>
+          <el-input v-model="form.email" placeholder="邮箱" type="email" required></el-input>
+        </el-form-item>
+
+        <el-form-item>
+          <el-row>
+            <el-col :span="16">
+              <el-input v-model="form.code" placeholder="验证码" required></el-input>
+            </el-col>
+            <el-col :span="8">
+              <el-button
+                :disabled="countdown > 0"
+                @click="sendCode"
+                type="primary"
+                size="small">
+                {{ countdown > 0 ? `${countdown}s` : '发送验证码' }}
+              </el-button>
+            </el-col>
+          </el-row>
+        </el-form-item>
+
+        <el-form-item>
+          <el-input v-model="form.newPassword" placeholder="新密码" type="password" required></el-input>
+        </el-form-item>
+
+        <el-form-item>
+          <el-input v-model="form.confirmPassword" placeholder="确认新密码" type="password" required></el-input>
+        </el-form-item>
+
+        <el-form-item>
+          <el-button type="primary" native-type="submit" block>提交</el-button>
+        </el-form-item>
+      </el-form>
+
       <p class="switch-mode">
         取消修改？<router-link to="/login">返回登录</router-link>
       </p>
-    </div>
+    </el-card>
   </div>
 </template>
 
 <script setup>
 import { ref, reactive } from 'vue'
+import { useRouter } from 'vue-router'
+import api from '../api/index.js'
 import axios from 'axios'
 
-import { useRouter } from 'vue-router';
-const router = useRouter();
-
-// 在需要使用的文件中
-import api from '../api/index.js';
+const router = useRouter()
 
 const form = reactive({
   email: '',
@@ -61,15 +82,14 @@ const handleReset = async () => {
     alert('两次密码不一致')
     return
   }
-   try {
-       // 调用 API 中的重置密码接口
-       const response = await api.resetPassword(form.email, form.newPassword);
-       console.log('修改密码响应数据:', response); // 调试用
-       alert('密码重置成功，请重新登录');
-       router.push('/login');
-     } catch (err) {
-       alert(err.response?.data?.message || '重置失败');
-     }
+  try {
+    const response = await api.resetPassword(form.email, form.newPassword)
+    console.log('修改密码响应数据:', response) // 调试用
+    alert('密码重置成功，请重新登录')
+    router.push('/login')
+  } catch (err) {
+    alert(err.response?.data?.message || '重置失败')
+  }
 }
 </script>
 
@@ -90,27 +110,11 @@ const handleReset = async () => {
   box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
 }
 
-input {
-  display: block;
+.el-input,
+.el-button {
   width: 100%;
-  padding: 0.6rem;
   margin: 0.5rem 0;
-  border: 1px solid #ccc;
-  border-radius: 0.5rem;
-}
-
-button {
-  width: 100%;
-  padding: 0.6rem;
-  background-color: #42b983;
-  border: none;
-  color: white;
-  border-radius: 0.5rem;
-  cursor: pointer;
-}
-
-button:hover {
-  background-color: #36986e;
+  height: 70%;
 }
 
 .switch-mode {

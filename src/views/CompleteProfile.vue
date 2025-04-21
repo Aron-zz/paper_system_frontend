@@ -1,42 +1,66 @@
 <template>
   <div class="auth-container">
-    <div class="form-card">
-      <h2 style="text-align: center; margin-bottom: 1rem;">完善个人信息(选填)</h2>
-      <form @submit.prevent="submitProfile">
-        <label>头像上传：</label>
-        <input type="file" @change="handleAvatarUpload" />
+    <el-card class="form-card">
+      <h2 class="title">完善个人信息(选填)</h2>
 
-        <label>联系方式：</label>
-        <input type="text" v-model="form.contact" placeholder="请输入手机号或邮箱" />
+      <el-form @submit.prevent="submitProfile" label-position="top">
+        <el-form-item label="头像上传：">
+          <div class="avatar-uploader-wrapper">
+            <el-upload
+              class="avatar-uploader"
+              :show-file-list="false"
+              :before-upload="beforeAvatarUpload"
+            >
+              <img v-if="avatarPreview" :src="avatarPreview" class="avatar" />
+              <el-icon v-else class="avatar-uploader-icon"><Plus /></el-icon>
+            </el-upload>
+          </div>
+        </el-form-item>
 
-        <label>生日：</label>
-        <input type="date" v-model="form.birthday" />
+        <el-form-item label="联系方式：">
+          <el-input v-model="form.contact" placeholder="请输入手机号或邮箱" size="large" class="form-input" />
+        </el-form-item>
 
-        <label>性别：</label>
-        <select v-model="form.gender">
-          <option value="">请选择</option>
-          <option value="男">男</option>
-          <option value="女">女</option>
-          <option value="保密">保密</option>
-        </select>
+        <el-form-item label="生日：">
+          <el-date-picker
+            v-model="form.birthday"
+            type="date"
+            placeholder="选择生日"
+            size="large"
+            class="form-input"
+          />
+        </el-form-item>
 
-        <label>所属单位：</label>
-        <input type="text" v-model="form.organization" placeholder="例如：xx大学 xx公司" />
+        <el-form-item label="性别：">
+          <el-select v-model="form.gender" placeholder="请选择性别" size="large" class="form-input">
+            <el-option label="男" value="男" />
+            <el-option label="女" value="女" />
+            <el-option label="保密" value="保密" />
+          </el-select>
+        </el-form-item>
 
-        <button type="submit">提交信息</button>
-      </form>
-    </div>
+        <el-form-item label="所属单位：">
+          <el-input v-model="form.organization" placeholder="例如：xx大学 xx公司" size="large" class="form-input" />
+        </el-form-item>
+
+        <el-form-item>
+          <el-button type="primary" size="large" class="submit-button" @click="submitProfile">提交信息</el-button>
+        </el-form-item>
+      </el-form>
+    </el-card>
   </div>
 </template>
+
 
 <script setup>
 import { ref } from 'vue'
 import { useRouter } from 'vue-router'
+import { ElMessage } from 'element-plus'
+import { Plus } from '@element-plus/icons-vue'
 
-// 在需要使用的文件中
-import api from '../api/index.js';
+// 导入 API
+import api from '../api/index.js'
 
-// 路由实例
 const router = useRouter()
 
 // 表单数据
@@ -48,66 +72,59 @@ const form = ref({
   avatar: null,
 })
 
-const avatarPreview = ref(''); // 用于头像预览
+const avatarPreview = ref('')
 
-// 当前登录用户 ID（你可以从本地缓存、全局状态、pinia等获取）
-const currentUserId = localStorage.getItem('id');
+// 当前登录用户 ID
+const currentUserId = localStorage.getItem('id')
 
-// 监听头像选择
-const handleAvatarUpload = (e) => {
-  form.value.avatar = e.target.files[0];
-  if (form.value.avatar) {
-    const reader = new FileReader();
-    reader.onload = () => {
-      avatarPreview.value = reader.result; // 设置头像预览
-    };
-    reader.readAsDataURL(form.value.avatar); // 读取头像文件为数据URL
+// 上传前处理
+const beforeAvatarUpload = (file) => {
+  form.value.avatar = file
+  const reader = new FileReader()
+  reader.onload = () => {
+    avatarPreview.value = reader.result
   }
-};
+  reader.readAsDataURL(file)
+  return false // 阻止 ElementPlus 自动上传
+}
 
-// 上传头像并返回 URL
+// 上传头像
 const uploadAvatar = async (file) => {
   try {
-    const res = await api.uploadAvatar(file, currentUserId);
-    return res.avatarUrl; // 后端返回的头像 URL
-  } catch (error) {
-    console.error('头像上传失败', error);
-    throw new Error('头像上传失败');
+    const res = await api.uploadAvatar(file, currentUserId)
+    return res.avatarUrl
+  } catch (err) {
+    ElMessage.error('头像上传失败')
+    throw err
   }
-};
+}
 
-// 提交资料
+// 提交表单
 const submitProfile = async () => {
   try {
     let avatarUrl = ''
-
-    // 有头像就先上传
     if (form.value.avatar) {
       avatarUrl = await uploadAvatar(form.value.avatar)
     }
 
-    // 构造 JSON 数据
     const profileData = {
       id: currentUserId,
       contact: form.value.contact || '未填写',
       birthday: form.value.birthday || '2000-01-01',
       gender: form.value.gender || '保密',
       organization: form.value.organization || '未知单位',
-      avatarUrl: avatarUrl
+      avatarUrl
     }
 
-    // 提交 JSON 数据
+    await api.completeProfile(profileData)
 
-     const res = await api.completeProfile(profileData);
-
-    alert('信息提交成功！')
+    ElMessage.success('信息提交成功！')
     router.push('/home/user-profile')
   } catch (err) {
-    alert(err.message || '提交失败，请重试')
+    ElMessage.error(err.message || '提交失败，请重试')
   }
 }
 </script>
-
 
 <style scoped>
 .auth-container {
@@ -119,34 +136,65 @@ const submitProfile = async () => {
 }
 
 .form-card {
-  background: white;
   padding: 2rem;
   border-radius: 1rem;
   width: 320px;
   box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
 }
 
-input,
-select {
-  display: block;
-  width: 100%;
-  padding: 0.6rem;
-  margin: 0.5rem 0;
-  border: 1px solid #ccc;
-  border-radius: 0.5rem;
+.avatar-uploader-wrapper {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  margin-bottom: 1rem;
 }
 
-button {
-  width: 100%;
-  padding: 0.6rem;
-  background-color: #42b983;
-  border: none;
-  color: white;
-  border-radius: 0.5rem;
+.avatar-uploader {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  width: 100px;
+  height: 100px;
+  border: 1px dashed #dcdfe6;
+  border-radius: 6px;
   cursor: pointer;
+  overflow: hidden;
+  position: relative;
 }
 
-button:hover {
-  background-color: #36986e;
+.avatar-uploader .el-icon {
+  font-size: 32px;
+  color: #8c939d;
 }
+
+.avatar {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.button-container {
+  text-align: center;
+  width: 100%;
+}
+
+.el-form-item {
+  margin-bottom: 1.2rem; /* 每个表单项之间间隔统一一点 */
+}
+
+.el-input,
+.el-select,
+.el-date-picker {
+  width: 100%;
+}
+
+.el-button {
+  width: 100%;
+  height: 36px; /* 设置按钮高度 */
+  padding: 0;  /* 移除内边距 */
+  line-height: 36px; /* 设置文本垂直居中 */
+}
+
 </style>
+
+

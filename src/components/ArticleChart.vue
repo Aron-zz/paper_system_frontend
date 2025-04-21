@@ -40,23 +40,34 @@ const renderChart = () => {
   }
 
   chartInstance = new ChartJS(ctx, {
-    type: 'bar',
-    data: {
-      labels: props.data.map(item => item.label),
-      datasets: [{
-        label: 'Articles',
-        data: props.data.map(item => item.value),
-        backgroundColor: 'rgba(255, 99, 132, 0.5)',
-        borderWidth: 1
-      }]
-    },
-    options: {
-      responsive: true,
-      scales: {
-        y: { beginAtZero: true }
+  type: 'bar',
+  data: {
+    labels: props.data.map(item => item.label),
+    datasets: [{
+      label: 'Articles',
+      data: props.data.map(item => item.value),
+      backgroundColor: 'rgba(255, 99, 132, 0.5)',
+      borderWidth: 1
+    }]
+  },
+  options: {
+    responsive: true,
+    scales: {
+      x: {
+        ticks: {
+          align: 'center'
+        },
+        grid: {
+          offset: true
+        }
+      },
+      y: {
+        beginAtZero: true
       }
     }
-  });
+  }
+});
+
 };
 
 // 优化渲染触发逻辑
@@ -81,4 +92,6 @@ onMounted(() => {
   width: 100%;
   height: 400px;
 }
+
+
 </style>

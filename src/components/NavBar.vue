@@ -1,5 +1,5 @@
 <template>
-  <div :class="{ dark: isDarkMode }" class="navbar">
+  <div :class="[{ dark: isDarkMode }, 'navbar']">
     <span class="time-info">{{ currentTime }}</span>
     <span class="user-info">你好!</span>
     <button @click="logout">退出</button>

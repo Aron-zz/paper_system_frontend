@@ -1,99 +1,100 @@
 <template>
   <div class="contact-management">
     <!-- 查询栏 -->
-    <div class="search-bar">
-      <input
+    <el-card class="search-bar">
+      <el-input
         v-model="searchName"
-        type="text"
         placeholder="Search by name"
-        @input="searchContact"
+        clearable
+        @input="handleSearchInput"
+        style="width: 300px; margin-right: 20px"
       />
-
-      <!-- 添加联系人按钮 -->
-      <button @click="addContact" class="primary">Add Contact</button>
-    </div>
+      <el-button type="primary" @click="addContact">Add Contact</el-button>
+    </el-card>
 
     <!-- 联系人列表 -->
-    <div class="contact-list">
-      <table>
-        <thead>
-          <tr>
-            <th>Name</th>
-            <th>Phone</th>
-            <th>Email</th>
-            <th>Relationship</th>
-            <th>Actions</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr v-for="contact in pagedContacts" :key="contact.id">
-            <td>{{ contact.name }}</td>
-            <td>{{ contact.phone }}</td>
-            <td>{{ contact.email }}</td>
-            <td>{{ contact.relationship }}</td>
-            <td>
-              <button :class="['primary', { 'dark-theme': isDarkMode }]" @click="editContact(contact)">Edit</button>
-              <button :class="['secondary', { 'dark-theme': isDarkMode }]" @click="deleteContact(contact.id)">Delete</button>
-            </td>
-          </tr>
-        </tbody>
-      </table>
-    </div>
+    <el-card class="contact-list">
+      <el-table :data="pagedContacts" style="width: 100%" v-loading="isLoading">
+        <el-table-column prop="name" label="Name" width="180" />
+        <el-table-column prop="phone" label="Phone" width="180" />
+        <el-table-column prop="email" label="Email" />
+        <el-table-column prop="relationship" label="Relationship" />
+        <el-table-column label="Actions" width="200">
+          <template #default="scope">
+            <el-button size="small" @click="editContact(scope.row)">Edit</el-button>
+            <el-button
+              size="small"
+              type="danger"
+              @click="deleteContact(scope.row.id)"
+            >Delete</el-button>
+          </template>
+        </el-table-column>
+      </el-table>
+    </el-card>
 
     <!-- 分页 -->
-   <div class="pagination">
-     <button
-       :disabled="currentPage === 1"
-       @click="currentPage--; loadData();"
-       class="primary"
-     >
-       Prev
-     </button>
-     <span>Page {{ currentPage }} of {{ totalPages }}</span>
-     <button
-       :disabled="currentPage === totalPages"
-       @click="currentPage++; loadData();"
-       class="primary"
-     >
-       Next
-     </button>
-   </div>
+    <el-pagination
+      v-model:current-page="currentPage"
+      :page-size="pageSize"
+      :total="totalContacts"
+      :page-sizes="[5, 10, 20]"
+      layout="total, sizes, prev, pager, next, jumper"
+      @current-change="handlePageChange"
+      @size-change="handleSizeChange"
+      style="margin-top: 20px; text-align: center;"
+    />
 
     <!-- 弹出窗口 - 编辑/添加联系人 -->
-    <div v-if="isModalOpen" class="modal">
-      <div class="modal-content">
-        <h3>{{ isEditing ? 'Edit Contact' : 'Add Contact' }}</h3>
-        <form @submit.prevent="handleSubmit">
-          <label for="name">Name:</label>
-          <input v-model="currentContact.name" type="text" id="name" required />
-
-          <label for="phone">Phone:</label>
-          <input v-model="currentContact.phone" type="text" id="phone" />
-
-          <label for="email">Email:</label>
-          <input v-model="currentContact.email" type="email" id="email" />
-
-          <label for="relationship">Relationship:</label>
-          <input v-model="currentContact.relationship" type="text" id="relationship" />
-
-          <button type="submit" class="primary">{{ isEditing ? 'Update' : 'Add' }}</button>
-          <button @click="closeModal" type="button" class="cancel">Cancel</button>
-        </form>
-      </div>
-    </div>
+    <el-dialog
+      v-model="isModalOpen"
+      :title="isEditing ? 'Edit Contact' : 'Add Contact'"
+      width="500px"
+    >
+      <el-form 
+        :model="currentContact" 
+        label-width="100px"
+        ref="contactForm"
+        :rules="formRules"
+      >
+        <el-form-item label="Name" prop="name" required>
+          <el-input v-model="currentContact.name" />
+        </el-form-item>
+        <el-form-item label="Phone" prop="phone">
+          <el-input v-model="currentContact.phone" />
+        </el-form-item>
+        <el-form-item label="Email" prop="email">
+          <el-input v-model="currentContact.email" type="email" />
+        </el-form-item>
+        <el-form-item label="Relationship" prop="relationship">
+          <el-input v-model="currentContact.relationship" />
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="closeModal">Cancel</el-button>
+        <el-button type="primary" @click="submitForm">
+          {{ isEditing ? 'Update' : 'Add' }}
+        </el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
 <script setup>
-import { ref, watch, computed, onMounted } from 'vue';
-import api from '../../api/index.js'; // 引入之前提供的 API 封装
+import { ref, computed, onMounted } from 'vue'
+import { ElMessage, ElMessageBox } from 'element-plus'
+import api from '../../api/index.js'
 
 // 状态管理
-const searchName = ref('');
-const currentPage = ref(1);
-const pageSize = 5; // 每页显示5个联系人
-const isModalOpen = ref(false);
-const isEditing = ref(false);
+const searchName = ref('')
+const currentPage = ref(1)
+const pageSize = ref(5)
+const isModalOpen = ref(false)
+const isEditing = ref(false)
+const isLoading = ref(false)
+const contacts = ref([])
+const totalContacts = ref(0)
+const contactForm = ref(null)
+
 const currentContact = ref({
   id: '',
   userId: '',
@@ -101,385 +102,211 @@ const currentContact = ref({
   phone: '',
   email: '',
   relationship: ''
-});
+})
 
-// 加载用户信息并验证 ID
-const userId = localStorage.getItem('id');
+// 表单验证规则
+const formRules = {
+  name: [
+    { required: true, message: 'Please input name', trigger: 'blur' },
+    { min: 2, max: 50, message: 'Length should be 2 to 50', trigger: 'blur' }
+  ],
+  email: [
+    { type: 'email', message: 'Please input correct email address', trigger: 'blur' }
+  ],
+  phone: [
+    { pattern: /^[0-9+\- ]+$/, message: 'Please input valid phone number', trigger: 'blur' }
+  ]
+}
 
+const userId = localStorage.getItem('id')
 
-// 获取联系人列表并分页
-const getContacts = async (page = currentPage.value, size = pageSize) => {
+// 计算属性：分页数据
+const pagedContacts = computed(() => {
+  return contacts.value
+})
+
+// 获取联系人列表
+const getContacts = async () => {
+  isLoading.value = true
   try {
-    const response = await api.getContactsByUserId(userId, page, size);
-    contacts.value = response.records;
-    currentPage.value = response.current;  // 这里同步后端的 current
-
-    totalPages.value = Math.ceil(response.total / pageSize);
-    console.log('返回获取的联系人信息:', response);
+    const response = await api.getContactsByUserId(
+      userId,
+      currentPage.value,
+      pageSize.value
+    )
+    contacts.value = response.records || []
+    totalContacts.value = response.total || 0
   } catch (error) {
-    console.error('Error fetching contacts:', error);
+    ElMessage.error('Error fetching contacts')
+    console.error('Error fetching contacts:', error)
+  } finally {
+    isLoading.value = false
   }
-};
+}
 
-const searchContact = () => {
-  currentPage.value = 1;
-  // 调用搜索接口，而不是普通分页接口
-  loadSearchResults();
-};
-
-const loadSearchResults = async () => {
+// 搜索联系人
+const searchContact = async () => {
+  isLoading.value = true
   try {
     const response = await api.searchContactsByName(
       userId,
-      searchName.value, // 搜索关键词
+      searchName.value,
       currentPage.value,
-      pageSize
-    );
-    contacts.value = response.records;
-    totalPages.value = Math.ceil(response.total / pageSize);
+      pageSize.value
+    )
+    contacts.value = response.records || []
+    totalContacts.value = response.total || 0
   } catch (error) {
-    console.error("搜索失败:", error);
+    ElMessage.error('Search failed')
+    console.error('Search failed:', error)
+  } finally {
+    isLoading.value = false
   }
-};
+}
+
+// 搜索输入处理（防抖）
+let searchTimer = null
+const handleSearchInput = () => {
+  clearTimeout(searchTimer)
+  searchTimer = setTimeout(() => {
+    currentPage.value = 1
+    if (searchName.value.trim()) {
+      searchContact()
+    } else {
+      getContacts()
+    }
+  }, 500)
+}
 
 // 删除联系人
 const deleteContact = async (id) => {
   try {
-    console.log('发送删除请求 ID:', id); // 打印出要删除的 ID
-    await api.deleteContact(id);
-    getContacts(); // 删除成功后重新加载联系人列表
+    await ElMessageBox.confirm(
+      'Are you sure to delete this contact?',
+      'Warning',
+      {
+        confirmButtonText: 'Confirm',
+        cancelButtonText: 'Cancel',
+        type: 'warning'
+      }
+    )
+    await api.deleteContact(id)
+    ElMessage.success('Contact deleted')
+    await loadData()
   } catch (error) {
-    console.error('Error deleting contact:', error);
+    if (error !== 'cancel') {
+      ElMessage.error('Delete failed')
+      console.error('Error deleting contact:', error)
+    }
   }
-};
+}
 
-// 分页数据
-const contacts = ref([]);
-const totalPages = ref(1);
+// 分页处理
+const handlePageChange = (val) => {
+  currentPage.value = val
+  loadData()
+}
 
-const pagedContacts = computed(() => {
-  return contacts.value.slice((currentPage.value - 1) * pageSize, currentPage.value * pageSize);
-});
+// 每页大小变化
+const handleSizeChange = (val) => {
+  pageSize.value = val
+  currentPage.value = 1
+  loadData()
+}
 
 // 打开编辑/添加窗口
 const editContact = (contact) => {
-  currentContact.value = { ...contact };
-  isEditing.value = true;
-  isModalOpen.value = true;
-};
+  currentContact.value = { ...contact }
+  isEditing.value = true
+  isModalOpen.value = true
+}
 
 const addContact = () => {
-  currentContact.value = { id: '', name: '', phone: '', email: '', relationship: '' };
-  isEditing.value = false;
-  isModalOpen.value = true;
-};
+  currentContact.value = {
+    id: '',
+    userId: userId,
+    name: '',
+    phone: '',
+    email: '',
+    relationship: ''
+  }
+  isEditing.value = false
+  isModalOpen.value = true
+}
 
 // 关闭弹出窗口
 const closeModal = () => {
-  isModalOpen.value = false;
-  resetForm();
-};
+  contactForm.value?.resetFields()
+  isModalOpen.value = false
+}
 
-// 提交表单（更新或添加联系人）
+// 提交表单验证
+const submitForm = async () => {
+  try {
+    await contactForm.value.validate()
+    await handleSubmit()
+  } catch (error) {
+    console.log('Form validation failed', error)
+  }
+}
+
+// 提交表单数据
 const handleSubmit = async () => {
   try {
-  // 在添加联系人时，排除 id 字段
-    currentContact.value.userId = userId;
-    const contactData = { ...currentContact.value };
-    if (!isEditing.value) {
-      delete contactData.id;  // 添加联系人时删除 id 字段
-    }
-
+    const contactData = { ...currentContact.value }
+    
     if (isEditing.value) {
-
-      await api.updateContact(contactData); // 更新联系人
+      await api.updateContact(contactData)
+      ElMessage.success('Contact updated')
     } else {
-
-      await api.addContact(contactData); // 添加联系人
+      delete contactData.id
+      await api.addContact(contactData)
+      ElMessage.success('Contact added')
     }
-    closeModal();
-    getContacts(); // 提交后重新加载联系人列表
+    
+    closeModal()
+    await loadData()
   } catch (error) {
-    console.error('Error submitting contact:', error);
+    ElMessage.error('Operation failed')
+    console.error('Error submitting contact:', error)
   }
-};
+}
 
+// 统一数据加载方法
 const loadData = async () => {
-  if (searchName.value) {
-    await loadSearchResults(); // 如果有搜索词，调用搜索接口
+  if (searchName.value.trim()) {
+    await searchContact()
   } else {
-    await getContacts(); // 否则调用普通分页接口
+    await getContacts()
   }
-};
+}
 
-// 监听 currentPage，自动加载数据
-watch(currentPage, (newPage) => {
-  loadData(); // 翻页时调用统一的数据加载方法
-});
-
-
-// 重置表单
-const resetForm = () => {
-  currentContact.value = { id: null, name: '', phone: '', email: '', relationship: '' };
-};
-
+// 初始化数据
 onMounted(() => {
-  getContacts(currentPage.value);
-});
-
+  loadData()
+})
 </script>
 
-
 <style scoped>
-/* 用户管理页面的基本布局 */
-.user-management {
+.contact-management {
   padding: 20px;
+  max-width: 1200px;
+  margin: 0 auto;
 }
 
-/* 整体暗色背景与字体 */
-.dark-theme .user-management {
-  background-color: #444;
-  color: #eee;
+.search-bar {
+  margin-bottom: 20px;
+  display: flex;
+  align-items: center;
 }
 
-
-.search-bar input {
-  padding: 8px;
-  font-size: 14px;
-  width: 200px;
+.contact-list {
   margin-bottom: 20px;
 }
 
-.user-list table {
-  width: 100%;
-  border-collapse: collapse;
-}
-
-.user-list th, .user-list td {
-  padding: 10px;
-  text-align: left;
-}
-
-.user-list th {
-  background-color: #f5f5f5;
-}
-
-.user-list td {
-  border-top: 1px solid #ddd;
-}
-
-.dark-theme th,
-.dark-theme td {
-  padding: 10px;
-  text-align: left;
-  border-top: 1px solid #444; /* 单元格的上边框颜色 */
-}
-
-.dark-theme th {
-  background-color: #555; /* 表头背景色 */
-}
-
-.dark-theme td {
-  background-color: #444; /* 单元格背景色 */
-}
-
-.pagination {
+.el-pagination {
+  justify-content: center;
   margin-top: 20px;
-  text-align: center;
-}
-
-.pagination button {
-  padding: 6px 12px;
-  font-size: 14px;
-  cursor: pointer;
-}
-
-.modal {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: rgba(0, 0, 0, 0.5);
-  display: flex;
-  justify-content: center;
-  align-items: center;
-}
-
-.modal-content {
-  background: white;
-  padding: 20px;
-  border-radius: 6px;
-  width: 400px;
-}
-
-.modal-content h3 {
-  margin-bottom: 20px;
-}
-
-.modal-content label {
-  display: block;
-  margin-bottom: 8px;
-}
-
-.modal-content input,
-.modal-content select {
-  width: 100%;
-  padding: 8px;
-  margin-bottom: 10px;
-  border: 1px solid #ccc;
-  border-radius: 4px;
-}
-
-.modal-content button {
-  padding: 10px 20px;
-  border: none;
-  border-radius: 4px;
-  cursor: pointer;
-  font-size: 14px;
-  margin-right: 10px;
-}
-
-.modal-content button.primary {
-  background-color: #4caf50;
-  color: white;
-}
-
-/* 暗模式下弹出窗口背景 */
-.dark-theme .modal {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: rgba(0, 0, 0, 0.7); /* 背景色稍暗 */
-  display: flex;
-  justify-content: center;
-  align-items: center;
-}
-
-/* 暗模式下弹出窗口内容 */
-.dark-theme .modal-content {
-  background-color: #333; /* 弹出窗口的背景色 */
-  padding: 20px;
-  border-radius: 6px;
-  width: 400px;
-  color: white; /* 文本颜色为白色 */
-}
-
-/* 弹出窗口标题 */
-.dark-theme .modal-content h3 {
-  margin-bottom: 20px;
-  color: #f5f5f5; /* 标题颜色 */
-}
-
-/* 标签样式 */
-.dark-theme .modal-content label {
-  display: block;
-  margin-bottom: 8px;
-  color: #f5f5f5; /* 标签文字颜色 */
-}
-
-/* 输入框样式 */
-.dark-theme .modal-content input,
-.dark-theme .modal-content select {
-  width: 100%;
-  padding: 8px;
-  margin-bottom: 10px;
-  border: 1px solid #555; /* 边框颜色 */
-  border-radius: 4px;
-  background-color: #444; /* 输入框背景色 */
-  color: white; /* 输入框文字颜色 */
-}
-
-/* 输入框和选择框的焦点颜色 */
-.dark-theme .modal-content input:focus,
-.dark-theme .modal-content select:focus {
-  border-color: #4caf50; /* 聚焦时边框颜色 */
-  outline: none; /* 去除聚焦时的外边框 */
-}
-
-/* 按钮样式 */
-.dark-theme .modal-content button.primary {
-  background-color: #222; /* 提交按钮背景色 */
-  color: white;
-}
-
-.dark-theme .modal-content button.cancel {
-  background-color: #888; /* 取消按钮背景色 */
-  color: white;
-}
-
-.dark-theme .modal-content button.primary:hover,
-.dark-theme .modal-content button.cancel:hover {
-  background-color: #4caf50; /* 暗模式下的按钮悬停效果 */
-}
-
-/* 按钮禁用状态 */
-.dark-theme .modal-content button:disabled {
-  background-color: #555;
-  cursor: not-allowed; /* 禁用按钮样式 */
-}
-
-
-.dark-theme .primary {
-  background-color: #333; /* 暗模式下的按钮背景色 */
-  color: white;
-}
-
-.dark-theme .primary:hover {
-  background-color: #4caf50; /* 暗模式下的按钮悬停效果 */
-}
-
-.dark-theme .secondary {
-  background-color: #444; /* 暗模式下的删除按钮 */
-  color: white;
-}
-
-.dark-theme .secondary:hover {
-  background-color: #f44336;
-}
-
-
-.modal-content button.secondary {
-  background-color: #f44336;
-  color: white;
-}
-
-
-
-.modal-content button.cancel {
-  background-color: #ccc;
-  color: #333;
-}
-
-.modal-content button:hover {
-  opacity: 0.8;
-}
-
-/* 按钮统一样式 */
-button.primary {
-  background-color: #4caf50;
-  color: white;
-}
-
-button.secondary {
-  background-color: #f44336;
-  color: white;
-}
-
-button.cancel {
-  background-color: #ccc;
-  color: #333;
-}
-
-button.primary:hover, button.secondary:hover, button.cancel:hover {
-  opacity: 0.8;
-}
-
-button:disabled {
-  background-color: #f0f0f0;
-  cursor: not-allowed;
 }
 
 
