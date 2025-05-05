@@ -88,17 +88,16 @@ const api = {
 
 
   // 每个用户发表的论文数
-  getUsersWithPaperCount: (page = 1, size = 10) =>
-    request.get('/api/user-paper/user-count', {
-      params: { page, size }
-    }),
+  // 获取所有用户及其论文数量信息（取消后端分页）
+getUsersWithPaperCount: () =>
+  request.get('/api/user-paper/user-count'),
 
 
-// 1. 根据 userId 分页查询联系人
-getContactsByUserId: (userId, page, size) =>
-  request.get(`/api/contacts/by-user/${userId}`, {
-    params: { page, size }
-  }),
+
+// 改为获取所有联系人（不传 page、size 参数）
+getAllContactsByUserId: (userId) =>
+  request.get(`/api/contacts/by-user/${userId}`)
+,
 
 // 2. 模糊搜索联系人姓名（userId + name）
 searchContactsByName: (userId, keyword, page, size) =>

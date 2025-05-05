@@ -70,7 +70,7 @@
             <el-dropdown>
               <span class="el-dropdown-link">
                 <el-avatar :size="30" src="https://cube.elemecdn.com/3/7c/3ea6beec64369c2642b92c6726f1epng.png" />
-                <span style="margin-left: 5px">用户名</span>
+                <span style="margin-left: 5px"> </span>
               </span>
               <template #dropdown>
                 <el-dropdown-menu>
@@ -217,6 +217,7 @@ const sidebarBgColor = computed(() => {
   overflow: hidden;
   display: flex;
   transition: background-color 0.3s ease, color 0.3s ease; /* 动画平滑 */
+  flex-direction: row;  /* 确保子元素按行排列 */
 }
 
 .layout-container {

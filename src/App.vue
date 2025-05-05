@@ -33,8 +33,8 @@ const isLoginRoute = computed(() => {
 body {
   margin: 0;
   font-family: "Helvetica Neue", Arial, sans-serif;
-  background-color: #f5f5f5;
 }
+
 
 /* 登录界面专属背景 */
 .login-layout {

@@ -120,22 +120,20 @@ const formRules = {
 
 const userId = localStorage.getItem('id')
 
-// 计算属性：分页数据
 const pagedContacts = computed(() => {
-  return contacts.value
+  const start = (currentPage.value - 1) * pageSize.value
+  const end = start + pageSize.value
+  return contacts.value.slice(start, end)
 })
 
-// 获取联系人列表
+
+
 const getContacts = async () => {
   isLoading.value = true
   try {
-    const response = await api.getContactsByUserId(
-      userId,
-      currentPage.value,
-      pageSize.value
-    )
-    contacts.value = response.records || []
-    totalContacts.value = response.total || 0
+    const response = await api.getAllContactsByUserId(userId)
+    contacts.value = response || []
+    totalContacts.value = contacts.value.length
   } catch (error) {
     ElMessage.error('Error fetching contacts')
     console.error('Error fetching contacts:', error)
@@ -143,6 +141,7 @@ const getContacts = async () => {
     isLoading.value = false
   }
 }
+
 
 // 搜索联系人
 const searchContact = async () => {
@@ -280,6 +279,7 @@ const loadData = async () => {
     await getContacts()
   }
 }
+
 
 // 初始化数据
 onMounted(() => {

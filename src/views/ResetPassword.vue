@@ -98,16 +98,21 @@ const handleReset = async () => {
   display: flex;
   justify-content: center;
   align-items: center;
-  height: 100vh;
-  background: #f3f4f6;
+  min-height: 100vh;
+  width: 100%;
+  background: #f3f4f6 url('src/assets/1.jpg') no-repeat center/cover;
+  padding: 20px; /* 安全边距 */
 }
 
 .form-card {
-  background: white;
   padding: 2rem;
   border-radius: 1rem;
-  width: 320px;
-  box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+  width: 90%;
+  max-width: 400px;
+  background: rgba(255, 255, 255, 0.7);
+  backdrop-filter: blur(10px);
+  box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.37);
+  margin: 0 auto;
 }
 
 .el-input,

@@ -25,16 +25,7 @@
               @update-visible-users="handleVisibleUsersUpdate"
               :loading="isLoading"
             />
-            <el-pagination
-              v-model:current-page="currentPage"
-              :page-size="pageSize"
-              :total="total"
-              layout="prev, pager, next, sizes"
-              :page-sizes="[5, 10, 20, 50]"
-              @current-change="changePage"
-              @size-change="handleSizeChange"
-              class="pagination"
-            />
+      
           </el-card>
         </el-col>
 
@@ -229,7 +220,7 @@ watch(currentPageUsers, (val) => {
 const loadUserPaperStats = async () => {
   isLoading.value = true
   try {
-    const res = await api.getUsersWithPaperCount(currentPage.value, pageSize.value)
+    const res = await api.getUsersWithPaperCount()
     allUsers.value = res.records || [] // 存储所有用户数据
     users.value = [...allUsers.value] // 复制一份用于分页
     total.value = res.total || 0

@@ -99,8 +99,10 @@ const loginWith = (platform) => {
   display: flex;
   justify-content: center;
   align-items: center;
-  background-image: url('src/assets/1.jpg'); 
-  background-size: cover;
+  min-height: 100vh;
+  width: 100%;
+  background: #f3f4f6 url('src/assets/1.jpg') no-repeat center/cover;
+  padding: 20px; /* 安全边距 */
 }
 
 .auth-card {
@@ -111,6 +113,7 @@ const loginWith = (platform) => {
   backdrop-filter: blur(10px);           /* 毛玻璃模糊效果 */
   box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.37); /* 微光影 */
 }
+
 
 .auth-title {
   text-align: center;
