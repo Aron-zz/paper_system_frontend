@@ -6,18 +6,18 @@
       </el-button>
     </div>
     
-    <el-table :data="articles" v-loading="loading" style="width: 100%">
-      <el-table-column prop="title" label="Title" width="200" />
-      <el-table-column prop="status" label="Status" width="120">
+    <el-table :data="articles" v-loading="loading" style="width: 100%"  scrollbar-always-on="true" :fit="true">
+      <el-table-column prop="title" label="Title" />
+      <el-table-column prop="status" label="Status" >
         <template #default="{row}">
           <el-tag :type="statusTagType(row.status)">
             {{ row.status }}
           </el-tag>
         </template>
       </el-table-column>
-      <el-table-column prop="createdAt" label="Created" width="180" />
-      <el-table-column prop="updatedAt" label="Updated" width="180" />
-      <el-table-column label="Actions" width="180" align="center">
+      <el-table-column prop="createdAt" label="Created"  />
+      <el-table-column prop="updatedAt" label="Updated"  />
+      <el-table-column label="Actions"  align="center">
         <template #default="{row}">
           <el-button size="small" @click="$emit('edit', row)">Edit</el-button>
           <el-button 
@@ -63,6 +63,7 @@ const statusTagType = (status) => {
 .list-header {
   margin-bottom: 16px;
   display: flex;
-  justify-content: flex-end;
+  justify-content: flex-start;
+
 }
 </style>
